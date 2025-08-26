@@ -63,9 +63,12 @@ def _(Path, config, pd):
     valeos_labs_df = load_valeos_table('labs')
     valeos_respiratory_df = load_valeos_table('respiratory_support')
     valeos_med_continuous_df = load_valeos_table('medication_admin_continuous')
+    valeos_code_status_df = load_valeos_table('code_status')
+    
 
     return (
         site_name,
+        valeos_code_status_df,
         valeos_hospitalization_df,
         valeos_labs_df,
         valeos_med_continuous_df,
@@ -89,6 +92,7 @@ def _(mo, site_name):
 
 @app.cell
 def _(
+    valeos_code_status_df,
     valeos_labs_df,
     valeos_med_continuous_df,
     valeos_respiratory_df,
@@ -99,7 +103,8 @@ def _(
         'Vitals': valeos_vitals_df,
         'Labs': valeos_labs_df,
         'Respiratory Support': valeos_respiratory_df,
-        'Medication Admin (Continuous)': valeos_med_continuous_df
+        'Medication Admin (Continuous)': valeos_med_continuous_df,
+        'Code Status': valeos_code_status_df
     }
 
     print("=== CLINICAL DATA SUMMARY ===")
@@ -1618,6 +1623,181 @@ def _(pd, plt):
 
     return (create_patient_liver_function_chart,)
 
+
+@app.cell
+def _(mo):
+    mo.md(r"""## Individual Patient Code Status""")
+    return
+
+
+@app.cell(hide_code=True)
+def _(
+    create_patient_code_status_chart,
+    mo,
+    patient_id,
+    valeos_code_status_df,
+    valeos_hospitalization_df,
+    valeos_transplant_df,
+):
+    # Create code status chart
+    patient_code_status_chart, code_status_error_msg = create_patient_code_status_chart(
+        patient_id, valeos_code_status_df, valeos_transplant_df, valeos_hospitalization_df
+    )
+
+    if code_status_error_msg:
+        patient_code_status_display = mo.md(f"**{code_status_error_msg}**")
+    elif patient_code_status_chart is not None:
+        patient_code_status_display = mo.as_html(patient_code_status_chart)
+    else:
+        patient_code_status_display = mo.md("**No code status data available**")
+
+    patient_code_status_display
+    return
+
+
+@app.cell(hide_code=True)
+def _(pd, plt):
+    def create_patient_code_status_chart(patient_id, code_status_df, transplant_df, hosp_df):
+        """Create individual patient code status timeline during transplant hospitalization"""
+        if patient_id is None or code_status_df is None or transplant_df is None or hosp_df is None:
+            return None, "Missing required data"
+
+        # Get patient transplant info
+        patient_transplant = transplant_df[transplant_df['patient_id'] == patient_id]
+        if patient_transplant.empty:
+            return None, f"No transplant data found for patient {patient_id}"
+
+        transplant_date = pd.to_datetime(patient_transplant.iloc[0]['transplant_date'], utc=True)
+        organ_type = patient_transplant.iloc[0]['transplant_type']
+
+        # Get patient's hospitalizations to find hospitalization_ids (CLIF key structure)
+        patient_hospitalizations = hosp_df[hosp_df['patient_id'] == patient_id].copy()
+        if patient_hospitalizations.empty:
+            return None, f"No hospitalization data found for patient {patient_id}"
+
+        # Get hospitalization IDs for this patient
+        patient_hosp_ids = patient_hospitalizations['hospitalization_id'].unique()
+
+        # Filter code status data 
+        patient_code_status_data = code_status_df[
+            code_status_df['patient_id'].isin(patient_hosp_ids)
+        ].copy()
+
+        if patient_code_status_data.empty:
+            return None, f"No code status data found for patient {patient_id}"
+
+        # Find the transplant hospitalization (contains transplant_date)
+        patient_hospitalizations['admission_dttm'] = pd.to_datetime(patient_hospitalizations['admission_dttm'], utc=True)
+        patient_hospitalizations['discharge_dttm'] = pd.to_datetime(patient_hospitalizations['discharge_dttm'], utc=True)
+
+        # Find hospitalization that contains the transplant date
+        transplant_hosp = patient_hospitalizations[
+            (patient_hospitalizations['admission_dttm'] <= transplant_date) &
+            (patient_hospitalizations['discharge_dttm'] >= transplant_date)
+        ]
+
+        if transplant_hosp.empty:
+            return None, f"Cannot find transplant hospitalization for patient {patient_id}"
+
+        admission_date = transplant_hosp.iloc[0]['admission_dttm']
+        discharge_date = transplant_hosp.iloc[0]['discharge_dttm']
+        transplant_hosp_id = transplant_hosp.iloc[0]['hospitalization_id']
+
+        # Filter code status data to transplant hospitalization only
+        transplant_code_status = patient_code_status_data[
+            patient_code_status_data['hospitalization_id'] == transplant_hosp_id
+        ].copy()
+
+        if transplant_code_status.empty:
+            return None, f"No code status data found during transplant hospitalization for patient {patient_id}"
+
+        # Convert datetime and sort by start time
+        transplant_code_status['start_dttm'] = pd.to_datetime(transplant_code_status['start_dttm'], utc=True)
+        transplant_code_status = transplant_code_status.sort_values('start_dttm')
+
+        # Create figure
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        # Define color mapping for code status categories
+        status_colors = {
+            'Full': '#2E8B57',           # Sea Green - most active
+            'Presume Full': '#90EE90',   # Light Green - presumed active
+            'DNR': '#FF6347',            # Tomato Red - do not resuscitate
+            'DNR/DNI': '#B22222',        # Fire Brick - do not resuscitate/intubate
+            'UDNR': '#FF69B4',           # Hot Pink - uncertain DNR
+            'Other': '#808080'           # Gray - other/unknown
+        }
+
+        # Create timeline visualization
+        y_pos = 0
+        prev_end_time = admission_date
+        
+        for idx, row in transplant_code_status.iterrows():
+            start_time = row['start_dttm']
+            status = row['code_status_category']
+            status_name = row['code_status_name']
+            
+            # Calculate hours from admission for positioning
+            start_hours = (start_time - admission_date).total_seconds() / 3600
+            
+            # For visualization, assume status continues until next change or discharge
+            if idx < len(transplant_code_status) - 1:
+                next_start = transplant_code_status.iloc[idx + 1]['start_dttm']
+                end_time = min(next_start, discharge_date)
+            else:
+                end_time = discharge_date
+                
+            end_hours = (end_time - admission_date).total_seconds() / 3600
+            duration_hours = end_hours - start_hours
+            
+            # Create rectangle for this status period
+            color = status_colors.get(status, '#808080')
+            rect = plt.Rectangle((start_hours, y_pos - 0.3), duration_hours, 0.6,
+                               facecolor=color, alpha=0.7, edgecolor='black', linewidth=1)
+            ax.add_patch(rect)
+            
+            # Add status label if duration is long enough
+            if duration_hours > 6:  # Only label if at least 6 hours
+                ax.text(start_hours + duration_hours/2, y_pos, status, 
+                       ha='center', va='center', fontweight='bold', fontsize=10)
+
+        # Add reference lines
+        transplant_hours = (transplant_date - admission_date).total_seconds() / 3600
+        discharge_hours = (discharge_date - admission_date).total_seconds() / 3600
+        
+        ax.axvline(x=0, color='green', linestyle='--', alpha=0.8, linewidth=2, label='Admission')
+        ax.axvline(x=transplant_hours, color='red', linestyle='-', alpha=0.9, linewidth=3, label='Transplant')
+        ax.axvline(x=discharge_hours, color='blue', linestyle='--', alpha=0.8, linewidth=2, label='Discharge')
+
+        # Format axes
+        ax.set_xlim(-2, discharge_hours + 2)
+        ax.set_ylim(-0.8, 0.8)
+        ax.set_xlabel('Hours from Admission', fontsize=12)
+        ax.set_ylabel('')
+        ax.set_yticks([])
+        
+        # Set title
+        ax.set_title(f'Code Status Timeline - Patient {patient_id} ({organ_type.title()} Transplant)', 
+                     fontsize=14, fontweight='bold', pad=20)
+
+        # Add legend for reference lines
+        ax.legend(loc='upper right')
+        
+        # Add legend for code status colors
+        from matplotlib.patches import Patch
+        legend_elements = [Patch(facecolor=color, label=status) 
+                          for status, color in status_colors.items() 
+                          if status in transplant_code_status['code_status_category'].values]
+        
+        ax2 = ax.twinx()
+        ax2.legend(handles=legend_elements, loc='upper left', title='Code Status Categories')
+        ax2.set_yticks([])
+        
+        plt.tight_layout()
+        
+        return fig, None
+
+    return (create_patient_code_status_chart,)
 
 if __name__ == "__main__":
     app.run()

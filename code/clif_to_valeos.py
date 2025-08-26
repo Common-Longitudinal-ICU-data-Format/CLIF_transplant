@@ -20,9 +20,21 @@ def _():
     import pandas as pd
     import sys
     import os
+    import logging
+    from datetime import datetime as dt_now
     from pathlib import Path
     import marimo as mo
 
+    # Set up logging configuration
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('clif_to_valeos_processing.log')
+        ]
+    )
+    logger = logging.getLogger(__name__)
 
     # Add utils directory relative to current script location
     CURRENT_DIR = Path(__file__).resolve().parent
@@ -30,13 +42,22 @@ def _():
     sys.path.append(str(UTILS_DIR))
 
     from load_config import load_config
-    return Path, load_config, mo, os, pd
+    
+    logger.info("=== CLIF TO VALEOS PROCESSING STARTED ===")
+    logger.info(f"Processing started at: {dt_now.now()}")
+    
+    return Path, dt_now, load_config, logger, mo, os, pd
 
 
 @app.cell
-def _(load_config):
+def _(load_config, logger):
     # Load configuration
+    logger.info("Step 1: Loading configuration...")
     config = load_config()
+    logger.info(f"✓ Configuration loaded successfully")
+    logger.info(f"  - Site: {config['site_name']}")
+    logger.info(f"  - Tables path: {config['tables_path']}")
+    logger.info(f"  - File type: {config['file_type']}")
     print(f"Site: {config['site_name']}")
     print(f"Tables path: {config['tables_path']}")
     print(f"File type: {config['file_type']}")
@@ -50,18 +71,24 @@ def _(mo):
 
 
 @app.cell
-def _(pd):
+def _(logger, pd):
     # load in transplant_df.csv
-    transplant_df = pd.read_csv('/Users/williamparker/Desktop/CLIF_tables/unique_enc_pat.csv')
+    logger.info("Step 2: Loading transplant patient data...")
+    transplant_df = pd.read_csv('/Users/dema/WD/CRI_2018_24/VALEOS/unique_enc_pat.csv')
+    logger.info(f"✓ Loaded transplant data: {len(transplant_df)} records")
 
     #drop hospitalization_id column
     transplant_df = transplant_df.drop(columns=['hospitalization_id'])
+    logger.info("✓ Dropped hospitalization_id column")
 
     #drop duplicate rows
+    original_count = len(transplant_df)
     transplant_df = transplant_df.drop_duplicates()
+    logger.info(f"✓ Removed {original_count - len(transplant_df)} duplicate rows")
 
     # Get unique transplant patient IDs from the CSV
     transplant_patient_ids = transplant_df['patient_id'].unique()
+    logger.info(f"✓ Identified {len(transplant_patient_ids)} unique transplant patients")
     print(f"Number of unique transplant patient IDs: {len(transplant_patient_ids)}")
     print(f"Sample patient IDs: {transplant_patient_ids[:5]}")
 
@@ -70,6 +97,7 @@ def _(pd):
 
     #rename service_date to transplant_date
     transplant_df = transplant_df.rename(columns={'service_date': 'transplant_date'})
+    logger.info("✓ Renamed service_date to transplant_date")
 
     #arrange columns in order of patient_id, transplant_date, transplant_type
     transplant_df = transplant_df[['patient_id', 'transplant_date', 'organ']]
@@ -79,6 +107,13 @@ def _(pd):
 
     #create a new column that is total number of transplants for each patient
     transplant_df['total_transplants'] = transplant_df.groupby('patient_id')['patient_id'].transform('count')
+    logger.info("✓ Added transplant numbering columns")
+
+    # Count transplants by organ type
+    organ_counts = transplant_df['organ'].value_counts()
+    logger.info("✓ Transplant counts by organ:")
+    for organ, count in organ_counts.items():
+        logger.info(f"  - {organ}: {count} transplants")
 
     # heart transplant recipient ids
     heart_transplant_ids = transplant_df[transplant_df['organ'] == 'heart']['patient_id'].unique()
@@ -99,6 +134,8 @@ def _(pd):
     kidney_transplant_ids = transplant_df[transplant_df['organ'] == 'kidney']['patient_id'].unique()
     print(f"Number of unique kidney transplant patient IDs: {len(kidney_transplant_ids)}")
     print(f"Sample kidney transplant patient IDs: {kidney_transplant_ids[:5]}")
+    
+    logger.info(f"✓ Step 2 completed - Transplant patient data processed")
     return heart_transplant_ids, transplant_df, transplant_patient_ids_str
 
 
@@ -116,7 +153,7 @@ def _(mo):
 
 
 @app.cell
-def _(Path, config, pd, transplant_patient_ids_str):
+def _(Path, config, logger, pd, transplant_patient_ids_str):
     def load_clif_table(table_name, config):
         """Load a CLIF table based on configuration"""
         tables_path = Path(config['tables_path'])
@@ -124,47 +161,67 @@ def _(Path, config, pd, transplant_patient_ids_str):
         file_path = tables_path / f"{table_name}.{file_type}"
 
         if not file_path.exists():
+            logger.warning(f"Table not found: {file_path}")
             print(f"Warning: {file_path} not found")
             return None
 
         try:
             if file_type == 'csv':
-                return pd.read_csv(file_path)
+                df = pd.read_csv(file_path)
             elif file_type == 'parquet':
-                return pd.read_parquet(file_path)
+                df = pd.read_parquet(file_path)
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")
+            
+            logger.info(f"✓ Loaded {table_name}: {len(df)} records")
+            return df
         except Exception as e:
+            logger.error(f"Error loading {file_path}: {str(e)}")
             print(f"Error loading {file_path}: {str(e)}")
             return None
 
     # Load the patient table
+    logger.info("Step 3: Loading and filtering CLIF patient table...")
     print("Loading CLIF patient table...")
     patient_df = load_clif_table('clif_patient', config)
 
-
-    #filter the patient_df to just transplant_patient_ids_str
-    patient_df = patient_df[patient_df['patient_id'].astype(str).isin(transplant_patient_ids_str)]
+    if patient_df is not None:
+        original_patients = len(patient_df)
+        #filter the patient_df to just transplant_patient_ids_str
+        patient_df = patient_df[patient_df['patient_id'].astype(str).isin(transplant_patient_ids_str)]
+        logger.info(f"✓ Filtered patient table: {original_patients} → {len(patient_df)} patients")
+        logger.info(f"✓ Step 3 completed - Patient table filtered to transplant recipients")
+    else:
+        logger.error("Failed to load patient table")
 
     patient_df.shape
     return load_clif_table, patient_df
 
 
 @app.cell
-def _(config, load_clif_table, transplant_patient_ids_str):
+def _(config, load_clif_table, logger, transplant_patient_ids_str):
     # load in hospitalization table and filter to transplant recipients
+    logger.info("Step 4: Loading and filtering hospitalization data...")
     hospitalization_df = load_clif_table('clif_hospitalization', config)
 
+    if hospitalization_df is not None:
+        original_hospitalizations = len(hospitalization_df)
+        #filter to transplant recipients by patient_id
+        hospitalization_df = hospitalization_df[hospitalization_df['patient_id'].isin(transplant_patient_ids_str)]
 
-    #filter to transplant recipients by patient_id
-    hospitalization_df = hospitalization_df[hospitalization_df['patient_id'].isin(transplant_patient_ids_str)]
+        logger.info(f"✓ Filtered hospitalizations: {original_hospitalizations} → {len(hospitalization_df)} records")
+        print(f"number of hospitilizations for transplant recipients: {len(hospitalization_df)}")
 
-    print(f"number of hospitilizations for transplant recipients: {len(hospitalization_df)}")
+        #count hospitalizations per patient
+        hospitalization_df['hospitalization_count'] = hospitalization_df.groupby('patient_id')['patient_id'].transform('count')
 
-    #count hospitalizations per patient
-    hospitalization_df['hospitalization_count'] = hospitalization_df.groupby('patient_id')['patient_id'].transform('count')
-
-    #check that all transplant recipients have at least one hospitalization
+        #check that all transplant recipients have at least one hospitalization
+        unique_patients_with_hosp = len(hospitalization_df['patient_id'].unique())
+        logger.info(f"✓ Patients with hospitalizations: {unique_patients_with_hosp}")
+        logger.info(f"✓ Step 4 completed - Hospitalization data filtered")
+    else:
+        logger.error("Failed to load hospitalization table")
+        
     len(hospitalization_df['patient_id'].unique())
     return (hospitalization_df,)
 
@@ -176,30 +233,47 @@ def _(transplant_patient_ids_str):
 
 
 @app.cell
-def _(config, os, pd):
+def _(config, logger, os, pd):
     # Load continuous medication admin
+    logger.info("Step 5: Loading continuous medication administration data...")
     med_cont_path = os.path.join(config['tables_path'], f"clif_medication_admin_continuous.{config['file_type']}")
     print(f"Loading continuous medication admin from: {med_cont_path}")
 
-    if config['file_type'] == 'parquet':
-        med_cont_df = pd.read_parquet(med_cont_path)
-    else:
-        med_cont_df = pd.read_csv(med_cont_path)
+    try:
+        if config['file_type'] == 'parquet':
+            med_cont_df = pd.read_parquet(med_cont_path)
+        else:
+            med_cont_df = pd.read_csv(med_cont_path)
 
-    print(f"Continuous medication admin loaded: {len(med_cont_df)} rows")
-    print(f"Columns: {list(med_cont_df.columns)}")
-    print("\nFirst few rows:")
-    print(med_cont_df.head())
+        logger.info(f"✓ Loaded continuous medication data: {len(med_cont_df)} records")
+        logger.info(f"✓ Columns available: {len(med_cont_df.columns)}")
+        print(f"Continuous medication admin loaded: {len(med_cont_df)} rows")
+        print(f"Columns: {list(med_cont_df.columns)}")
+        print("\nFirst few rows:")
+        print(med_cont_df.head())
+        logger.info(f"✓ Step 5 completed - Medication data loaded")
+    except Exception as e:
+        logger.error(f"Failed to load continuous medication data: {str(e)}")
+        med_cont_df = None
+        
     return (med_cont_df,)
 
 
 @app.cell
-def _(config, hospitalization_df, load_clif_table):
+def _(config, hospitalization_df, load_clif_table, logger):
     # Load in vitals table
+    logger.info("Step 6: Loading and filtering vitals data...")
     vitals_df = load_clif_table('clif_vitals', config)
 
-    # filter to hospitalizations in hospitalization_df
-    vitals_df = vitals_df[vitals_df['hospitalization_id'].isin(hospitalization_df['hospitalization_id'])]
+    if vitals_df is not None and hospitalization_df is not None:
+        original_vitals = len(vitals_df)
+        # filter to hospitalizations in hospitalization_df
+        vitals_df = vitals_df[vitals_df['hospitalization_id'].isin(hospitalization_df['hospitalization_id'])]
+        logger.info(f"✓ Filtered vitals data: {original_vitals} → {len(vitals_df)} records")
+        logger.info(f"✓ Step 6 completed - Vitals data filtered to transplant hospitalizations")
+    else:
+        logger.error("Failed to filter vitals data")
+        
     return (vitals_df,)
 
 
@@ -469,31 +543,39 @@ def _(mo):
     mo.md(r"""## Step 4: Filter Remaining CLIF Tables""")
     return
 
-
 @app.cell
-def _(config, hospitalization_df, load_clif_table):
+def _(config, hospitalization_df, load_clif_table, logger):
     # Load and filter labs table
+    logger.info("Step 7: Loading and filtering clinical data tables...")
+    logger.info("  - Loading labs table...")
     print("Loading and filtering labs table...")
     labs_df = load_clif_table('clif_labs', config)
     if labs_df is not None:
+        original_labs = len(labs_df)
         labs_df_filtered = labs_df[labs_df['hospitalization_id'].isin(hospitalization_df['hospitalization_id'])]
+        logger.info(f"  ✓ Labs: {original_labs} → {len(labs_df_filtered)} records")
         print(f"Labs records: {len(labs_df)} -> {len(labs_df_filtered)} (filtered)")
     else:
         labs_df_filtered = None
+        logger.warning("  - Labs table not found")
         print("Labs table not found")
     return (labs_df_filtered,)
 
 
 @app.cell
-def _(config, hospitalization_df, load_clif_table):
+def _(config, hospitalization_df, load_clif_table, logger):
     # Load and filter medication_admin_intermittent table
+    logger.info("  - Loading intermittent medication table...")
     print("Loading and filtering medication_admin_intermittent table...")
     med_int_df = load_clif_table('clif_medication_admin_intermittent', config)
     if med_int_df is not None:
+        original_med_int = len(med_int_df)
         med_int_df_filtered = med_int_df[med_int_df['hospitalization_id'].isin(hospitalization_df['hospitalization_id'])]
+        logger.info(f"  ✓ Intermittent medications: {original_med_int} → {len(med_int_df_filtered)} records")
         print(f"Intermittent medication records: {len(med_int_df)} -> {len(med_int_df_filtered)} (filtered)")
     else:
         med_int_df_filtered = None
+        logger.warning("  - Intermittent medication table not found")
         print("Medication admin intermittent table not found")
     return (med_int_df_filtered,)
 
@@ -558,7 +640,39 @@ def _(config, hospitalization_df, load_clif_table):
         proc_df_filtered = None
         print("Patient procedure table not found")
 
-    return crrt_df_filtered, ecmo_df_filtered, proc_df_filtered
+    # Microbiology culture
+    micro_culture_df = load_clif_table('clif_microbiology_culture', config)
+    if micro_culture_df is not None:
+        micro_culture_df_filtered = micro_culture_df[micro_culture_df['hospitalization_id'].isin(hospitalization_df['hospitalization_id'])]
+        print(f"Microbiology culture records: {len(micro_culture_df)} -> {len(micro_culture_df_filtered)} (filtered)")
+    else:
+        micro_culture_df_filtered = None
+        print("Microbiology culture table not found")
+
+    # Microbiology non-culture
+    micro_non_culture_df = load_clif_table('clif_microbiology_non_culture', config)
+    if micro_non_culture_df is not None:
+        micro_non_culture_df_filtered = micro_non_culture_df[micro_non_culture_df['hospitalization_id'].isin(hospitalization_df['hospitalization_id'])]
+        print(f"Microbiology non-culture records: {len(micro_non_culture_df)} -> {len(micro_non_culture_df_filtered)} (filtered)")
+    else:
+        micro_non_culture_df_filtered = None
+        print("Microbiology non-culture table not found")
+
+    # Microbiology susceptibility (filtered by organism_id from culture table)
+    micro_susceptibility_df = load_clif_table('clif_microbiology_susceptibility', config)
+    if micro_susceptibility_df is not None and micro_culture_df_filtered is not None and len(micro_culture_df_filtered) > 0:
+        # Get organism IDs from filtered culture data
+        transplant_organism_ids = micro_culture_df_filtered['organism_id'].unique()
+        micro_susceptibility_df_filtered = micro_susceptibility_df[micro_susceptibility_df['organism_id'].isin(transplant_organism_ids)]
+        print(f"Microbiology susceptibility records: {len(micro_susceptibility_df)} -> {len(micro_susceptibility_df_filtered)} (filtered)")
+    else:
+        micro_susceptibility_df_filtered = None
+        if micro_susceptibility_df is None:
+            print("Microbiology susceptibility table not found")
+        else:
+            print("Microbiology susceptibility table found but no culture data to filter against")
+
+    return crrt_df_filtered, ecmo_df_filtered, proc_df_filtered, micro_culture_df_filtered, micro_non_culture_df_filtered, micro_susceptibility_df_filtered
 
 
 @app.cell
@@ -569,7 +683,7 @@ def _(config, hospitalization_df, load_clif_table):
     # Code status
     code_status_df = load_clif_table('clif_code_status', config)
     if code_status_df is not None:
-        code_status_df_filtered = code_status_df[code_status_df['hospitalization_id'].isin(hospitalization_df['hospitalization_id'])]
+        code_status_df_filtered = code_status_df[code_status_df['patient_id'].isin(hospitalization_df['patient_id'])]
         print(f"Code status records: {len(code_status_df)} -> {len(code_status_df_filtered)} (filtered)")
     else:
         code_status_df_filtered = None
@@ -594,31 +708,40 @@ def _(mo):
 
 
 @app.cell
-def _(Path, config):
+def _(Path, config, logger):
     # Create Valeos output directory
+    logger.info("Step 8: Setting up Valeos output directory...")
     tables_path = Path(config['tables_path'])
     valeos_dir = tables_path / 'Valeos'
     valeos_dir.mkdir(exist_ok=True)
 
+    logger.info(f"✓ Created/verified Valeos directory: {valeos_dir}")
     print(f"Created Valeos directory: {valeos_dir}")
 
     # Get site name for file naming
     site_name = config['site_name']
+    logger.info(f"✓ Site name for file naming: {site_name}")
+    logger.info("✓ Step 8 completed - Output directory ready")
 
     return site_name, valeos_dir
 
 
 @app.cell
 def _(
+    transplant_hospitalization,
     adt_df_filtered,
     code_status_df_filtered,
     crrt_df_filtered,
     ecmo_df_filtered,
     hosp_diag_df_filtered,
     hospitalization_df,
-    labs_df_filtered,
+    # labs_df_filtered,
+    logger,
     med_cont_df,
-    med_int_df_filtered,
+    # med_int_df_filtered,
+    micro_culture_df_filtered,
+    micro_non_culture_df_filtered,
+    micro_susceptibility_df_filtered,
     patient_df,
     proc_df_filtered,
     resp_df_filtered,
@@ -628,38 +751,64 @@ def _(
     vitals_df,
 ):
     # Filter continuous medication data to transplant hospitalizations
-    med_cont_df_filtered = med_cont_df[med_cont_df['hospitalization_id'].isin(transplant_hosp_ids)]
-    print(f"Continuous medication records: {len(med_cont_df)} -> {len(med_cont_df_filtered)} (filtered)")
+    logger.info("Step 9: Finalizing data filtering and exporting tables...")
+    logger.info("  - Filtering continuous medication data to transplant hospitalizations...")
+    
+    if med_cont_df is not None:
+        original_med_cont = len(med_cont_df)
+        transplant_hosp_ids = transplant_hospitalization['hospitalization_id'].unique()
+        med_cont_df_filtered = med_cont_df[med_cont_df['hospitalization_id'].isin(transplant_hosp_ids)]
+        logger.info(f"  ✓ Continuous medications: {original_med_cont} → {len(med_cont_df_filtered)} records")
+        print(f"Continuous medication records: {len(med_cont_df)} -> {len(med_cont_df_filtered)} (filtered)")
+    else:
+        med_cont_df_filtered = None
+        logger.warning("  - No continuous medication data available")
 
     # Dictionary of tables to export
     tables_to_export = {
         'patient': patient_df,
         'hospitalization': hospitalization_df,
         'vitals': vitals_df,
-        'labs': labs_df_filtered,
+        # 'labs': labs_df_filtered,
         'medication_admin_continuous': med_cont_df_filtered,
-        'medication_admin_intermittent': med_int_df_filtered,
+        # 'medication_admin_intermittent': med_int_df_filtered,
         'respiratory_support': resp_df_filtered,
         'adt': adt_df_filtered,
         'crrt_therapy': crrt_df_filtered,
         'ecmo_mcs': ecmo_df_filtered,
         'patient_procedure': proc_df_filtered,
         'code_status': code_status_df_filtered,
-        'hospital_diagnosis': hosp_diag_df_filtered
+        'hospital_diagnosis': hosp_diag_df_filtered,
+        'microbiology_culture': micro_culture_df_filtered,
+        'microbiology_non_culture': micro_non_culture_df_filtered,
+        'microbiology_susceptibility': micro_susceptibility_df_filtered
     }
 
     # Export each table as parquet
+    logger.info("  - Exporting tables to parquet format...")
     exported_files = []
+    tables_with_data = 0
+    tables_without_data = 0
+    
     for export_tbl_name, export_tbl_df in tables_to_export.items():
         if export_tbl_df is not None and len(export_tbl_df) > 0:
             filename = f"{site_name}_valeos_inpatient_{export_tbl_name}.parquet"
             filepath = valeos_dir / filename
-            export_tbl_df.to_parquet(filepath, index=False)
-            exported_files.append(filename)
-            print(f"Exported {export_tbl_name}: {len(export_tbl_df)} records -> {filepath}")
+            try:
+                export_tbl_df.to_parquet(filepath, index=False)
+                exported_files.append(filename)
+                tables_with_data += 1
+                logger.info(f"  ✓ Exported {export_tbl_name}: {len(export_tbl_df)} records")
+                print(f"Exported {export_tbl_name}: {len(export_tbl_df)} records -> {filepath}")
+            except Exception as e:
+                logger.error(f"  ✗ Failed to export {export_tbl_name}: {str(e)}")
         else:
+            tables_without_data += 1
+            logger.info(f"  - Skipped {export_tbl_name}: No data available")
             print(f"Skipped {export_tbl_name}: No data available")
 
+    logger.info(f"✓ Export summary: {tables_with_data} tables exported, {tables_without_data} tables skipped")
+    logger.info(f"✓ Step 9 completed - All clinical data tables exported")
     print(f"\nExported {len(exported_files)} tables to {valeos_dir}")
     return exported_files, tables_to_export
 
@@ -671,23 +820,33 @@ def _(mo):
 
 
 @app.cell
-def _(site_name, transplant_df, valeos_dir):
+def _(logger, site_name, transplant_df, valeos_dir):
     # Create the transplant table with unique transplant records
+    logger.info("Step 10: Creating and exporting transplant table...")
     transplant_table = transplant_df.copy()
 
     # Rename 'organ' to 'transplant_type' for clarity
     transplant_table = transplant_table.rename(columns={'organ': 'transplant_type'})
+    logger.info("  ✓ Renamed 'organ' to 'transplant_type'")
 
     # Ensure proper column order
     transplant_table = transplant_table[['patient_id', 'transplant_date', 'transplant_type', 'transplant_number', 'total_transplants']]
+    logger.info("  ✓ Finalized column structure")
 
     # Export transplant table
     transplant_filename = f"{site_name}_valeos_inpatient_transplant.parquet"
     transplant_filepath = valeos_dir / transplant_filename
-    transplant_table.to_parquet(transplant_filepath, index=False)
-
-    print(f"Exported transplant table: {len(transplant_table)} records -> {transplant_filepath}")
-    print(f"Transplant table columns: {list(transplant_table.columns)}")
+    
+    try:
+        transplant_table.to_parquet(transplant_filepath, index=False)
+        logger.info(f"  ✓ Exported transplant table: {len(transplant_table)} records")
+        logger.info(f"  ✓ File location: {transplant_filepath}")
+        logger.info(f"✓ Step 10 completed - Transplant table exported")
+        
+        print(f"Exported transplant table: {len(transplant_table)} records -> {transplant_filepath}")
+        print(f"Transplant table columns: {list(transplant_table.columns)}")
+    except Exception as e:
+        logger.error(f"  ✗ Failed to export transplant table: {str(e)}")
 
     return (transplant_table,)
 
@@ -700,40 +859,80 @@ def _(mo):
 
 @app.cell
 def _(
+    dt_now,
     exported_files,
+    logger,
     site_name,
     tables_to_export,
     transplant_table,
     valeos_dir,
 ):
+    logger.info("Step 11: Generating final summary and statistics...")
+    
     print("=== VALEOS DATABASE EXPORT SUMMARY ===")
     print(f"Site: {site_name}")
     print(f"Output directory: {valeos_dir}")
     print(f"Total files exported: {len(exported_files) + 1}")  # +1 for transplant table
     print()
 
+    # Log detailed export summary
+    logger.info("=== FINAL EXPORT SUMMARY ===")
+    logger.info(f"Site: {site_name}")
+    logger.info(f"Output directory: {valeos_dir}")
+    logger.info(f"Total files exported: {len(exported_files) + 1}")
+
     print("Table Export Summary:")
+    logger.info("Table Export Summary:")
+    summary_tables_with_data = 0
+    summary_tables_without_data = 0
+    total_records_exported = 0
+    
     for tbl_name, tbl_df in tables_to_export.items():
         if tbl_df is not None and len(tbl_df) > 0:
+            summary_tables_with_data += 1
+            total_records_exported += len(tbl_df)
+            logger.info(f"  ✓ {tbl_name}: {len(tbl_df):,} records")
             print(f"  ✓ {tbl_name}: {len(tbl_df):,} records")
         else:
+            summary_tables_without_data += 1
+            logger.info(f"  ✗ {tbl_name}: No data")
             print(f"  ✗ {tbl_name}: No data")
 
+    # Add transplant table to summary
+    total_records_exported += len(transplant_table)
+    logger.info(f"  ✓ transplant: {len(transplant_table):,} records")
     print(f"  ✓ transplant: {len(transplant_table):,} records")
     print()
 
     print("Transplant Summary:")
+    logger.info("Transplant Summary by Organ:")
     transplant_counts = transplant_table['transplant_type'].value_counts()
-    for organ, count in transplant_counts.items():
-        print(f"  {organ}: {count:,} transplants")
+    for organ_type, transplant_count in transplant_counts.items():
+        logger.info(f"  - {organ_type}: {transplant_count:,} transplants")
+        print(f"  {organ_type}: {transplant_count:,} transplants")
 
-    print(f"\nTotal unique transplant patients: {transplant_table['patient_id'].nunique():,}")
-    print(f"Total transplant procedures: {len(transplant_table):,}")
+    unique_patients = transplant_table['patient_id'].nunique()
+    total_procedures = len(transplant_table)
+    
+    logger.info(f"Total unique transplant patients: {unique_patients:,}")
+    logger.info(f"Total transplant procedures: {total_procedures:,}")
+    logger.info(f"Total clinical records exported: {total_records_exported:,}")
+    
+    print(f"\nTotal unique transplant patients: {unique_patients:,}")
+    print(f"Total transplant procedures: {total_procedures:,}")
 
     # Multi-transplant patients
     multi_transplant = transplant_table[transplant_table['total_transplants'] > 1]
     if len(multi_transplant) > 0:
-        print(f"Patients with multiple transplants: {multi_transplant['patient_id'].nunique():,}")
+        multi_patients = multi_transplant['patient_id'].nunique()
+        logger.info(f"Patients with multiple transplants: {multi_patients:,}")
+        print(f"Patients with multiple transplants: {multi_patients:,}")
+
+    # Final completion log
+    logger.info(f"Processing completed at: {dt_now.now()}")
+    logger.info(f"✓ SUCCESS: All {summary_tables_with_data + 1} tables exported successfully")
+    logger.info(f"Tables with data: {summary_tables_with_data + 1}, Tables skipped: {summary_tables_without_data}")
+    logger.info("=== CLIF TO VALEOS PROCESSING COMPLETED SUCCESSFULLY ===")
 
     return
 

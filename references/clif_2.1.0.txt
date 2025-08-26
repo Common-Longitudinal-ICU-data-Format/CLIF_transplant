@@ -19,7 +19,7 @@ The admission, discharge, and transfer (ADT) table is a start-stop longitudinal 
 | out\_dttm | DATETIME | End date and time at a particular location. All datetime variables must be timezone-aware and set to UTC. | Datetime format should be `YYYY-MM-DD HH:MM:SS+00:00` (UTC) |  |
 | location\_name | VARCHAR | Location of the patient inside the hospital. This field is used to store the patient location from the source data. It is not used for analysis. | No restriction |  |
 | location\_category | VARCHAR | Maps `location_name` to a standardized list of ADT location categories | `ed`, `ward`, `stepdown`, `icu`, `procedural`, `l&d`, `hospice`, `psych`, `rehab`, `radiology`, `dialysis`, `other` |  |
-| location\_type | VARCHAR | Maps ICU type to a standardized list of ICU categories | [List of ICU categories in CLIF](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/clif_adt_location_type.csv) |  |
+| location\_type | VARCHAR | Maps ICU type to a standardized list of ICU categories | [List of ICU categories in CLIF](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/adt/clif_adt_location_type.csv) |  |
 
 **Notes**:
 
@@ -41,6 +41,7 @@ The admission, discharge, and transfer (ADT) table is a start-stop longitudinal 
 The crrt\_therapy table captures Continuous Renal Replacement Therapy (CRRT) data, including different CRRT modalities, operational parameters, and fluid exchange details. The intermittent HD, peritoneal dialysis, PERT, and SLED tables are under development.
 
 | hospitalization\_id | VARCHAR | Unique identifier for hospitalization episode |
+| device\_id | VARCHAR | Unique ID of the individual dialysis machine used (e.g., machine ACZ3RV91). Distinct from dialysis_machine_name, which stores the brand/model. | 
 | recorded\_dttm | DATETIME | Timestamp when CRRT parameters were recorded |
 | crrt\_mode\_name | VARCHAR | Name of CRRT mode (e.g., “CVVHDF”) |
 | crrt\_mode\_category | VARCHAR | `scuf`, `cvvh`, `cvvhd`, `cvvhdf` |
@@ -80,8 +81,8 @@ The ECMO/MCS table is a wider longitudinal table that captures the start and sto
 | hospitalization\_id | VARCHAR | Unique identifier for the hospitalization event. |
 | recorded\_dttm | DATETIME | Date and time when the device settings and/or measurement was recorded. |
 | device\_name | VARCHAR | Name of the ECMO/MCS device used including brand information, e.g. “Centrimag” |
-| device\_category | VARCHAR | Maps `device_name` to a standardized mCIDE, e.g.: `Impella`, `Centrimag`, `TandemHeart`, `HeartMate`, `ECMO`, `Other` |
-| mcs\_group | VARCHAR | Maps `device_category` to a standardized mCIDE of MCS types ( `durable_LVAD`, `temporary_LVAD`, `RVAD`, `IABP`, `ECMO`). [List of mcs groups available on CLIF](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/tree/main/mCIDE) |
+| device\_category | VARCHAR | Maps `device_name` to a standardized mCIDE, e.g.: `Impella`, `Centrimag`, `TandemHeart`, `HeartMate`, `ECMO`, `Other`. [List of device categories in CLIF](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/ecmo_mcs/clif_ecmo_mcs_groups.csv) |
+| mcs\_group | VARCHAR | Maps `device_category` to a standardized mCIDE of MCS types ( `durable_LVAD`, `temporary_LVAD`, `RVAD`, `IABP`, `ECMO`). [List of mcs groups available on CLIF](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/ecmo_mcs/clif_ecmo_mcs_groups.csv) |
 | side | VARCHAR | `right`, `left`, `both` |
 | device\_metric\_name | VARCHAR | String that captures the measure of work rate of the device, e.g., RPMs. |
 | device\_rate | DOUBLE | Numeric value of work rate, e.g., 3000 RPMs. |
@@ -109,9 +110,9 @@ The hospitalization table contains information about each hospitalization event.
 | discharge\_dttm | DATETIME | Date and time the patient is discharged from the hospital. All datetime variables must be timezone-aware and set to UTC. | Datetime format should be `YYYY-MM-DD HH:MM:SS+00:00`(UTC) |
 | age\_at\_admission | INT | Age of the patient at the time of admission, in years | No restriction |
 | admission\_type\_name | VARCHAR | Type of inpatient admission. Original string from the source data | e.g. “Direct admission”, “Transfer”, “Pre-op surgical” |
-| admission\_type\_category | VARCHAR | Admission disposition mapped to mCIDE categories | [List of admission type categories in CLIF](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/clif_hospitalization_admission_type_categories.csv) |
+| admission\_type\_category | VARCHAR | Admission disposition mapped to mCIDE categories | [List of admission type categories in CLIF](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/hospitalization/clif_hospitalization_admission_type_categories.csv) |
 | discharge\_name | VARCHAR | Original discharge disposition name string recorded in the raw data | No restriction, e.g. “home” |
-| discharge\_category | VARCHAR | Maps `discharge_name` to a standardized list of discharge categories | `Home`, `Skilled Nursing Facility (SNF)`, `Expired`, `Acute Inpatient Rehab Facility`, `Hospice`, `Long Term Care Hospital (LTACH)`, `Acute Care Hospital`, `Group Home`, `Chemical Dependency`, `Against Medical Advice (AMA)`, `Assisted Living`, `Still Admitted`, `Missing`, `Other`, `Psychiatric Hospital`, `Shelter`, `Jail` |
+| discharge\_category | VARCHAR | Maps `discharge_name` to a standardized list of discharge categories | [Home, Skilled Nursing Facility (SNF), Expired, Acute Inpatient Rehab Facility, Hospice, Long Term Care Hospital (LTACH), Acute Care Hospital, Group Home, Chemical Dependency, Against Medical Advice (AMA), Assisted Living, Still Admitted, Missing, Other, Psychiatric Hospital, Shelter, Jail](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/hospitalization/clif_hospitalization_discharge_categories.csv) |
 | zipcode\_nine\_digit | VARCHAR | Patient’s 9 digit zip code, used to link with other indices such as ADI and SVI | No restriction |
 | zipcode\_five\_digit | VARCHAR | Patient’s 5 digit zip code, used to link with other indices such as ADI and SVI | No restriction |
 | census\_block\_code | VARCHAR | 15 digit FIPS code | No restriction |
@@ -139,6 +140,28 @@ The hospitalization table contains information about each hospitalization event.
 | 101002 | 87654321 | 22334455 | 2024-11-04 15:00:00+00:00 | 2024-11-07 11:00:00+00:00 | 72 | Transfer from another hospital | Acute Care Transfer | Transferred to Acute Inpatient Rehab Facility | Acute Inpatient Rehab Facility | 46311 | 463110000 | 170313301002 | 41.55030 | -87.30101 |
 | 101003 | 11223344 | 11223344 | 2024-10-20 07:45:00+00:00 | 2024-10-22 10:20:00+00:00 | 59 | Pre-op surgical | Pre-op | Expired | Expired | 60446 | 604460000 | 170313401003 | 41.70010 | -87.60315 |
 
+## Hospital Diagnosis [Anchor](https://clif-consortium.github.io/website/data-dictionary/data-dictionary-2.1.0.html/#hospital_diagnosis)
+
+Record of all diagnoses associated with the hospitalization. Expect breaking changes to this table as we seek to align it with existing diagnosis ontologies.
+
+[![](https://img.shields.io/badge/Maturity-Concept-orange.png)](https://clif-consortium.github.io/website/maturity.html)
+
+| hospitalization\_id | VARCHAR | ID variable for each patient encounter | Must match a hospitalization\_id in the hospitalization table |
+| diagnosis\_code | VARCHAR | ICD diagnosis code | Valid ICD-9-CM or ICD-10-CM code |
+| diagnosis\_code\_format | VARCHAR | Format of the code (e.g., ICD-10-CM, ICD-9-CM) | ICD-10-CM, ICD-9-CM |
+| diagnosis\_name | VARCHAR | Optional human-readable description of the diagnosis | No restriction |
+| diagnosis\_type | VARCHAR | Type of diagnosis (e.g., Principal, Secondary) | Principal, Secondary, Other |
+| present\_on\_admission | VARCHAR | Indicator if the diagnosis was present on admission (Yes/No) | Yes, No |
+
+**Example**:
+
+| 20010012          | I10            | ICD-10-CM            | Essential (primary) hypertension                 | Principal     | Yes                 |
+| 20010012          | E11.9          | ICD-10-CM            | Type 2 diabetes mellitus                         | Secondary     | No                  |
+| 20010015          | 250.00         | ICD-9-CM             | Diabetes mellitus without mention of complication| Principal     | Yes                 |
+| 20010015          | 401.9          | ICD-9-CM             | Unspecified essential hypertension               | Secondary     | No                  |
+| 20010020          | J45.909        | ICD-10-CM            | Unspecified asthma, uncomplicated                | Principal     | Yes                 |
+| 20010020          | 530.81         | ICD-9-CM             | Esophageal reflux                                | Secondary     | Yes                 |
+
 ## Labs [Anchor](https://clif-consortium.github.io/website/data-dictionary/data-dictionary-2.1.0.html\#labs)
 
 The labs table is a long form (one lab result per row) longitudinal table.
@@ -152,10 +175,10 @@ The labs table is a long form (one lab result per row) longitudinal table.
 | lab\_order\_name | VARCHAR | Procedure name for the lab, e.g. “Complete blood count w/ diff” | No restriction |
 | lab\_order\_category | VARCHAR | Maps `lab_order_name` to standardized list of common lab order names, e.g. “CBC” | CDE under development |
 | lab\_name | VARCHAR | Original lab component as recorded in the raw data, e.g. “AST (SGOT)”. | No restriction |
-| lab\_category | VARCHAR | Maps `lab_name` to a minimum set of standardized labs identified by the CLIF consortium as minimum necessary labs for the study of critical illness. | [List of lab categories in CLIF](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/clif_lab_categories.csv) |
+| lab\_category | VARCHAR | Maps `lab_name` to a minimum set of standardized labs identified by the CLIF consortium as minimum necessary labs for the study of critical illness. | [List of lab categories in CLIF](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/labs/clif_lab_categories.csv) |
 | lab\_value | VARCHAR | Recorded value corresponding to a lab. Lab values are often strings that can contain non-numeric results (e.g. “> upper limit of detection”). | No restriction |
 | lab\_value\_numeric | DOUBLE | Parse out numeric part of the lab\_value variable (optional). | Numeric |
-| reference\_unit | VARCHAR | Unit of measurement for that lab. | Permissible reference values for each `lab_category` listed [here](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/clif_lab_categories.csv) |
+| reference\_unit | VARCHAR | Unit of measurement for that lab. | Permissible reference values for each `lab_category` listed [here](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/labs/clif_lab_categories.csv) |
 | lab\_specimen\_name | VARCHAR | Original fluid or tissue name the lab was collected from as given in the source data | No restriction |
 | lab\_specimen\_category | VARCHAR | fluid or tissue the lab was collected from, analogous to the LOINC “system” component. | working CDE `c(blood/plasma/serum, urine, csf, other)`. |
 | lab\_loinc\_code | VARCHAR | [LOINC](https://loinc.org/get-started/loinc-term-basics/) code for the lab | No restrictions |
@@ -183,8 +206,8 @@ The medication admin continuous table is a long-form (one medication administrat
 | med\_order\_id | VARCHAR | Medication order ID. Foreign key to link this table to other medication tables |  |
 | admin\_dttm | DATETIME | Date and time when the medicine was administered. All datetime variables must be timezone-aware and set to UTC. | Datetime format should be `YYYY-MM-DD HH:MM:SS+00:00`(UTC) |
 | med\_name | VARCHAR | Original med name string recorded in the raw data which often contains concentration e.g. “NOREPInephrine 8 mg/250 mL” |  |
-| med\_category | VARCHAR | Maps `med_name` to a limited set of active ingredients for important ICU medications, e.g. “norepinephrine” | [List of continuous medication categories in CLIF](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/clif_medication_admin_continuous_med_categories.csv) |
-| med\_group | VARCHAR | Limited number of ICU medication groups identified by the CLIF consortium, e.g. “vasoactives” | [List of continuous medication groups in CLIF](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/clif_medication_admin_continuous_med_categories.csv) |
+| med\_category | VARCHAR | Maps `med_name` to a limited set of active ingredients for important ICU medications, e.g. “norepinephrine” | [List of continuous medication categories in CLIF](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/medication_admin_continuous/clif_medication_admin_continuous_med_categories.csv) |
+| med\_group | VARCHAR | Limited number of ICU medication groups identified by the CLIF consortium, e.g. “vasoactives” | [List of continuous medication groups in CLIF](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/medication_admin_continuous/clif_medication_admin_continuous_med_categories.csv) |
 | med\_route\_name | VARCHAR | Medicine delivery route | e.g. IV, enteral |
 | med\_route\_category | VARCHAR | Maps `med_route_name` to a standardized list of medication delivery routes | Under-development |
 | med\_dose | DOUBLE | Quantity taken in dose |  |
@@ -207,14 +230,23 @@ The medication admin continuous table is a long-form (one medication administrat
 
 The microbiology non-culture table is a wide longitudinal table that captures the order and result times of non-culture microbiology tests, the type of fluid collected, the component of the test, and the result of the test.
 
-| hospitalization\_id | Unique identifier for the hospitalization event. |
-| result\_dttm | Date and time when the non-culture result was obtained. |
-| collect\_dttm | Date and time when the sample was collected. |
-| order\_dttm | Date and time when the test was ordered. |
-| fluid\_name | Name of the fluid sample. |
-| component\_category | Category of the component tested. |
-| result\_unit\_category | Unit category of the test result. |
-| result\_category | Category of the test result. |
+| hospitalization_id   | VARCHAR  | ID variable for each patient encounter | No restriction |
+| result_dttm         | DATETIME | Date and time when the non-culture result was obtained. All datetime variables must be timezone-aware and set to UTC. | Datetime format should be `YYYY-MM-DD HH:MM:SS+00:00` |
+| collect_dttm        | DATETIME | Date and time when the sample was collected. All datetime variables must be timezone-aware and set to UTC. | Datetime format should be `YYYY-MM-DD HH:MM:SS+00:00` |
+| order_dttm          | DATETIME | Date and time when the test was ordered. All datetime variables must be timezone-aware and set to UTC. | Datetime format should be `YYYY-MM-DD HH:MM:SS+00:00` |
+| fluid_name          | VARCHAR  | Name of the fluid sample. | No restriction |
+| fluid_category      | VARCHAR  | Fluid categories defined according to the NIH common data elements. | [CDE NIH Infection Site](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/microbiology_nonculture/clif_microbiology_nonculture_fluid_category.csv) |
+| method_name         | VARCHAR  | Original method names from the source data. | No restriction |
+| method_category     | VARCHAR  | Maps method_name to a standardized list of method categories. | [culture, gram stain, smear](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/microbiology_nonculture/clif_microbiology_nonculture_micro_component_category.csv) |
+| micro_order_name    | VARCHAR  | String name of microbiology non-culture test. | No restriction |
+| organism_category   | VARCHAR  | Maps the organism name in micro_order_name to the standardized list of organisms under the structure of genus species. | Organism species. [Check this file for examples](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/microbiology_culture/clif_microbiology_culture_organism_categories.csv). |
+| organism_group      | VARCHAR  | Maps organism_category to the standardized list of organisms under the NIH CDE structure. | [CDE NIH Organism](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/microbiology_culture/clif_microbiology_culture_organism_groups.csv) |
+| result_name         | VARCHAR  | Result name from the raw data. | No restriction |
+| result_category     | VARCHAR  | Category of the test result. | [Check list of result categories](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/microbiology_nonculture/clif_microbiology_nonculture_result_category.csv) |
+| reference_low       | DOUBLE   | Reference low value. | No restriction |
+| reference_high      | DOUBLE   | Reference high value. | No restriction |
+| result_units        | VARCHAR  | Unit of the test result. | No restriction |
+| lab_loinc_code      | VARCHAR  | LOINC code. | No restriction |
 
 **Example**:
 
@@ -259,8 +291,8 @@ The patient\_assessments table captures various assessments performed on patient
 | hospitalization\_id | VARCHAR | Primary Identifier. Unique identifier linking assessments to a specific patient hospitalization. |  |
 | recorded\_dttm | DATETIME | The exact date and time when the assessment was recorded, ensuring temporal accuracy. | Datetime format should be `YYY-MM-DD HH:MM:SS+00:00`(UTC) |
 | assessment\_name | VARCHAR | Assessment Tool Name. The primary name of the assessment tool used (e.g., GCS, NRS, SAT Screen). | No restriction |
-| assessment\_category | VARCHAR | Maps `assessment_name` to a standardized list of patient assessments | List of permissible assessment categories [here](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/clif_patient_assessment_categories.csv) |
-| assessment\_group | VARCHAR | Broader Assessment Group. This groups the assessments into categories such as “Sedation,” “Neurologic,” “Pain,” etc. | List of permissible assessment groups [here](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/clif_patient_assessment_categories.csv) |
+| assessment\_category | VARCHAR | Maps `assessment_name` to a standardized list of patient assessments | List of permissible assessment categories [here](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/patient_assessments/clif_patient_assessment_categories.csv) |
+| assessment\_group | VARCHAR | Broader Assessment Group. This groups the assessments into categories such as “Sedation,” “Neurologic,” “Pain,” etc. | List of permissible assessment groups [here](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/patient_assessments/clif_patient_assessment_categories.csv) |
 | numerical\_value | DOUBLE | Numerical Assessment Result. The numerical result or score from the assessment component. | Applicable for assessments with numerical outcomes (e.g., 0-10, 3-15). |
 | categorical\_value | VARCHAR | Categorical Assessment Result. The categorical outcome from the assessment component. | Applicable for assessments with categorical outcomes (e.g., Pass/Fail, Yes/No). |
 | text\_value | VARCHAR | Textual Assessment Result. The textual explanation or notes from the assessment component. | Applicable for assessments requiring textual data. |
@@ -305,6 +337,7 @@ The respiratory support table is a wider longitudinal table that captures simult
 | hospitalization\_id | VARCHAR | ID variable for each patient encounter |  |
 | recorded\_dttm | DATETIME | Date and time when the device settings and/or measurement was recorded. | Datetime format should be `YYY-MM-DD HH:MM:SS+00:00` (UTC) |
 | device\_name | VARCHAR | Includes raw string of the devices. Not used for analysis | No restriction |
+| device\_id | VARCHAR | Unique ID of the individual physical device used (e.g. ventilator ACZ3RV91), enables linkage to continuous waveform data. Distinct from vent_brand_name, which stores the brand or model.| |
 | device\_category | VARCHAR | Maps `device_name` to a standardized list of respiratory support device categories | `IMV`, `NIPPV`, `CPAP`, `High Flow NC`, `Face Mask`, `Trach Collar`, `Nasal Cannula`, `Room Air`, `Other` |
 | vent\_brand\_name | VARCHAR | Ventilator model name when `device_category` is `IMV` or `NIPPV` (Optional) | No restriction |
 | mode\_name | VARCHAR | Includes raw string of the modes, e.g. “CMV volume control” | No restriction |
@@ -562,47 +595,70 @@ This table records the ordering (not administration) of medications. The table i
 
 The microbiology culture table is a wide longitudinal table that captures the order and result times of microbiology culture tests, the type of fluid collected, the component of the test, and the organism identified.
 
-| hospitalization\_id | VARCHAR | ID variable for each patient encounter. |  |
-| order\_dttm | DATETIME | Date and time when the test is ordered. | Datetime format should be `YYY-MM-DD HH:MM:SS+00:00` |
-| collect\_dttm | DATETIME | Date and time when the specimen is collected. | Datetime format should be `YYY-MM-DD HH:MM:SS+00:00` |
-| result\_dttm | DATETIME | Date and time when the results are available. | Datetime format should be `YYY-MM-DD HH:MM:SS+00:00` |
-| fluid\_name | VARCHAR | Cleaned fluid name string from the raw data. This field is not used for analysis. | No restriction. Check this [file for examples](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/mCIDE_mapping_examples/clif_vocab_microbiology_culture_fluid_ucmc.csv) |
-| fluid\_category | VARCHAR | Fluid categories defined according to the NIH common data elements. | [CDE NIH Infection Site](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/clif_microbiology_culture_fluid_categories.csv) |
-| component\_name | VARCHAR | Original component names from the source data. | No restriction |
-| component\_category | VARCHAR | Maps `component_name` to a standardized list of component categories | `culture`, `gram stain`, `smear` |
-| organism\_name | VARCHAR | Cleaned organism name string from the raw data. This field is not used for analysis. | No restriction. [Check this file for examples](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/mCIDE_mapping_examples/clif_vocab_microbiology_name_organism_ucmc.csv) |
-| organism\_category | VARCHAR | Maps `organism_name` to the standardized list of organisms in the NIH CDE | [CDE NIH Organism](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/clif_microbiology_culture_organism_categories.csv) |
+| hospitalization_id | VARCHAR | ID variable for each patient encounter. | No restriction |
+| organism_id | VARCHAR | Distinct numerical identifier that each site creates which links a unique, non-missing organism_category that has a distinct patient_id, hospitalization_id, lab_order_dttm, lab_collect_dttm, lab_result_dttm, and fluid_category with its method_category == culture from the microbiology_culture table to an antibiotic_category and susceptibility_category from the microbiology_susceptibility table | No restriction |
+| order_dttm | DATETIME | Date and time when the test is ordered. | Datetime format should be YYYY-MM-DD HH:MM:SS+00:00 |
+| collect_dttm | DATETIME | Date and time when the specimen is collected. | Datetime format should be YYYY-MM-DD HH:MM:SS+00:00 |
+| result_dttm | DATETIME | Date and time when the results are available. | Datetime format should be YYYY-MM-DD HH:MM:SS+00:00 |
+| fluid_name | VARCHAR | Fluid name string from the raw data. | No restriction. [Check this file for examples](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/mCIDE_mapping_examples/00_mCIDE_mapping_examples/clif_vocab_microbiology_culture_fluid_ucmc.csv) |
+| fluid_category | VARCHAR | Fluid categories defined according to the NIH common data elements. | [CDE NIH Infection Site](https://github.com/clif-consortium/CLIF/blob/main/mCIDE/microbiology_culture/clif_microbiology_culture_fluid_categories.csv) |
+| method_name | VARCHAR | Original method names from the source data. | No restriction |
+| method_category | VARCHAR | Maps method_name to a standardized list of method categories. | [culture, gram stain, smear](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/microbiology_culture/clif_microbiology_culture_method_categories.csv) |
+| organism_name | VARCHAR | Organism name from the raw data. | No restriction. |
+| organism_category | VARCHAR | Maps organism_name to the standardized list of organisms under the structure of genus species. | Organism species. [Check this file for examples](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/microbiology_culture/clif_microbiology_culture_organism_categories.csv). |
+| organism_group | VARCHAR | Maps organism_category to the standardized list of organisms under the NIH CDE structure. | [CDE NIH Organism](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/microbiology_culture/clif_microbiology_culture_organism_groups.csv) |
+| lab_loinc_code | VARCHAR | LOINC code. | No restriction |
 
 **Example**:
 
-| 12345 | 2023-10-01 14:00:00+00:00 | 2023-10-01 15:00:00+00:00 | 2023-10-03 10:00:00+00:00 | culture, blood (bacterial & fungal) | blood/buffy coat | culture | culture | no growth | no growth |
-| 12345 | 2023-10-01 16:00:00+00:00 | 2023-10-01 17:00:00+00:00 | 2023-10-03 12:00:00+00:00 | culture, urine | genito-urinary tract | culture | culture | escherichia\_coli | escherichia (also e. coli) |
-| 12346 | 2023-11-01 10:30:00+00:00 | 2023-11-01 11:15:00+00:00 | 2023-11-02 09:00:00+00:00 | culture & stain, respiratory | lower respiratory tract | gram stain | gram stain | gram positive cocci | gram positive cocci (nos) |
-| 12346 | 2023-11-02 12:00:00+00:00 | 2023-11-02 12:45:00+00:00 | 2023-11-03 08:30:00+00:00 | culture, cerebrospinal fluid | csf | culture | culture | no growth | no growth |
-| 12347 | 2023-09-15 14:20:00+00:00 | 2023-09-15 15:00:00+00:00 | 2023-09-17 11:30:00+00:00 | culture & stain, afb | other unspecified | afb smear | smear | no growth | no growth |
-| 12348 | 2023-08-10 09:00:00+00:00 | 2023-08-10 09:45:00+00:00 | 2023-08-12 08:00:00+00:00 | culture, blood (bacterial & fungal) | blood/buffy coat | culture | culture | staphylococcus\_aureus | staphylococcus (all) |
-| 12349 | 2023-07-25 11:00:00+00:00 | 2023-07-25 11:30:00+00:00 | 2023-07-27 10:15:00+00:00 | culture, urine | genito-urinary tract | culture | culture | enterococcus\_faecium | enterococcus (all species) |
-| 12350 | 2023-06-15 13:30:00+00:00 | 2023-06-15 14:00:00+00:00 | 2023-06-17 09:45:00+00:00 | culture & stain, respiratory | lower respiratory tract | gram stain | gram stain | gram negative rod | gram negative rod (nos) |
+| HOSP12345 | ORG001 | 2025-06-05 08:15:00+00:00 | 2025-06-05 08:45:00+00:00 | 2025-06-06 12:00:00+00:00 | AFB/FUNGAL BLOOD CULTURE | Blood/Buffy Coat | Blood culture | culture | Acinetobacter baumanii | acinetobacter_baumanii | acinetobacter (baumanii, calcoaceticus, lwoffi, other species) |  |
+| HOSP12345 | ORG002 | 2025-06-05 08:15:00+00:00 | 2025-06-05 08:45:00+00:00 | 2025-06-06 12:00:00+00:00 | AFB/FUNGAL BLOOD CULTURE | Blood/Buffy Coat | Blood culture | culture | Candida albicans | candida_albicans | candida albicans |  |
+| HOSP67890 | ORG003 | 2025-06-10 14:10:00+00:00 | 2025-06-10 14:35:00+00:00 | 2025-06-11 09:20:00+00:00 | BRAIN BIOPSY CULTURE | Brain | Tissue culture | culture | Aspergillus fumigatus | aspergillus_fumigatus | asperguillus fumigatus |  |
 
-## Procedures [Anchor](https://clif-consortium.github.io/website/data-dictionary/data-dictionary-2.1.0.html\#procedures)
+## Patient Procedures [Anchor](https://clif-consortium.github.io/website/data-dictionary/data-dictionary-2.1.0.html\#patient-procedures)
 
 [![](https://img.shields.io/badge/Maturity-Concept-orange.png)](https://clif-consortium.github.io/website/maturity.html)
 
 A longitudinal record of each bedside ICU procedure performed on the patient (e.g. central line placement, chest tube placement). Note that this table is not intended to capture the full set of procedures performed on inpatients.
 
-| hospitalization\_id | VARCHAR | Unique identifier for each hospitalization, linking the procedure to a specific encounter |  |
-| procedure\_name | VARCHAR | Name of the procedure performed on the patient | Examples include “ `Central Line Placement`” |
-| procedure\_category | VARCHAR | Maps `procedure_name` to a list of standardized procedures | CDE under development |
-| diagnosis | VARCHAR | The diagnosis or reason for performing the procedure |  |
-| start\_dttm | DATETIME | Date and time when the procedure was initiated |  |
+| patient_id | VARCHAR | Unique identifier for each patient, presumed to be a distinct individual. | No restriction |
+| hospitalization_id | VARCHAR | ID variable for each patient encounter | No restriction |
+| provider_id | VARCHAR | Uniquely identifies the provider associated with the procedure. | No restriction |
+| procedure_code | VARCHAR | Encoded procedure identifier (e.g., CPT, ICD-10-PCS, SNOMED code). | No restriction |
+| procedure_code_format | VARCHAR | Code format used (e.g., CPT, ICD-10-PCS, SNOMED). | CPT, ICD-10-PCS, SNOMED, etc. |
+| recorded_dttm | DATETIME | Date and time the procedure was performed or recorded. All datetime variables must be timezone-aware and set to UTC. | Datetime format should be YYYY-MM-DD HH:MM:SS+00:00 (UTC) |
 
 **Example**:
 
-| 1001 | Central Line Placement | Vascular Access | Sepsis with hypotension | 2024-01-01 08:00:00 |
-| 1001 | Chest Tube Placement | Respiratory Support | Pneumothorax | 2024-01-01 10:00:00 |
-| 1002 | Endotracheal Intubation | Airway Management | Acute Respiratory Failure | 2024-01-05 09:30:00 |
-| 1002 | Paracentesis | Diagnostic Procedure | Suspected peritonitis | 2024-01-05 11:00:00 |
-| 1003 | Arterial Line Placement | Vascular Access | Hemodynamic Monitoring | 2024-01-10 07:00:00 |
+| patient_id | procedure_code | procedure_code_format | recorded_dttm           |
+|------------|----------------|----------------------|-------------------------|
+| 101001     | 36556          | CPT                  | 2024-01-01 08:00:00+00:00 UTC |
+| 101001     | 32551          | CPT                  | 2024-01-01 10:00:00+00:00 UTC |
+| 101002     | 0BH17EZ        | ICD-10-PCS           | 2024-01-05 09:30:00+00:00 UTC |
+| 101002     | 4700000        | SNOMED               | 2024-01-05 11:00:00+00:00 UTC |
+| 101003     | 36620          | CPT                  | 2024-01-10 07:00:00+00:00 UTC |
+
+## Place Based Index [Anchor](https://clif-consortium.github.io/website/data-dictionary/data-dictionary-2.1.0.html#place-based-index)
+
+[![](https://img.shields.io/badge/Maturity-Concept-orange.png)](https://clif-consortium.github.io/website/maturity.html)
+
+The place_based_index table is designed to store geospatial or community-level indices linked to a patient's hospitalization.
+
+| hospitalization_id | VARCHAR | ID variable for each patient encounter | No restriction |
+| index_name | VARCHAR | The name of the index (e.g., Area Deprivation Index, Social Vulnerability Index). | No restriction |
+| index_value | DOUBLE | The numerical value of the index for the given hospitalization. | Numeric |
+| index_version | VARCHAR | Version of the index used (e.g., ADI 2019, SVI 2020). | No restriction |
+
+**Notes**:  
+Source indices from validated and publicly available datasets.
+
+**Example**:
+
+| hospitalization_id | index_name                 | index_value | index_version   |
+|-------------------|----------------------------|-------------|-----------------|
+| 1001              | Area Deprivation Index     | 85.2        | ADI 2019        |
+| 1001              | Social Vulnerability Index | 0.72        | SVI 2020        |
+| 1002              | Area Deprivation Index     | 67.5        | ADI 2019        |
 
 ## Provider [Anchor](https://clif-consortium.github.io/website/data-dictionary/data-dictionary-2.1.0.html\#provider)
 
@@ -628,24 +684,30 @@ Continuous start stop record of every provider who cared for the patient.
 | 1003036 | 2023-07-15 07:30:00+00:00 | 2023-07-16 07:30:00+00:00 | Charge Nurse | Nurse |
 | 1004047 | 2023-08-20 10:00:00+00:00 | 2023-08-20 22:00:00+00:00 | Physical Therapist | Therapy |
 
-## Sensitivity [Anchor](https://clif-consortium.github.io/website/data-dictionary/data-dictionary-2.1.0.html\#sensitivity)
+## Microbiology Susceptibility [Anchor](https://clif-consortium.github.io/website/data-dictionary/data-dictionary-2.1.0.html#microbiology-susceptibility)
 
 [![](https://img.shields.io/badge/Maturity-Concept-orange.png)](https://clif-consortium.github.io/website/maturity.html)
 
-This table is used to store the susceptibility results of the organisms identified in the `Microbiology Culture` table and may be renamed to `Microbiology_Susceptibility`
+This table is used to store the susceptibility results of the organisms identified in the `Microbiology Culture`.
 
-| culture\_id | VARCHAR | Unique identifier linking to the culture from which the sensitivity test was performed |  |
-| antibiotic | VARCHAR | Name of the antibiotic tested for sensitivity | Examples include `Penicillin`, `Vancomycin` |
-| sensitivity | VARCHAR | The result of the sensitivity test, indicating the organism’s resistance or susceptibility | `Resistant`, `Intermediate`, `Susceptible` |
-| mic | DOUBLE | Minimum Inhibitory Concentration (MIC) value, which measures the lowest concentration of an antibiotic needed to inhibit growth |  |
+| organism_id | VARCHAR | Distinct numerical identifier that each site creates which links a unique, non-missing organism_category that has a distinct patient_id, hospitalization_id, lab_order_dttm, lab_collect_dttm, lab_result_dttm, and fluid_category with its method_category == culture from the microbiology_culture table to an antibiotic_category and susceptibility_category from the microbiology_susceptibility table | No restriction |
+| antibiotic_name | VARCHAR | Name of the antibiotic | No restriction |
+| antibiotic_category | VARCHAR | Category or class of the antibiotic tested | [List of antibiotic categories in CLIF](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/blob/main/mCIDE/microbiology_susceptibility/clif_microbiology_susceptibility_antibiotics_category.csv) |
+| sensitivity_name | VARCHAR | Name of the test result used to determine susceptibility (e.g., value of mcg/mL or MIC) | No restriction |
+| susceptibility_name | VARCHAR | Name of the sensitivity interpretation | No restriction |
+| susceptibility_category | VARCHAR | Standardized category of susceptibility | [susceptible, non susceptible, intermediate, NA](https://github.com/Common-Longitudinal-ICU-data-Format/CLIF/tree/main/mCIDE/microbiology_susceptibility/clif_microbiology_susceptibility_category.csv) |
 
 **Example**:
 
-| 1001 | Penicillin | Susceptible | 0.25 |
-| 1001 | Vancomycin | Resistant | 8.0 |
-| 1002 | Amoxicillin | Intermediate | 4.0 |
-| 1003 | Ciprofloxacin | Susceptible | 0.5 |
-| 1004 | Gentamicin | Resistant | 16.0 |
+| organism_id | antibiotic_name                 | antibiotic_category        | sensitivity_name           | susceptibility_name         | susceptibility_category |
+|-------------|---------------------------------|---------------------------|----------------------------|----------------------------|------------------------|
+| 1           | avycex (ceftazidime/avibactam)  | ceftazidime_avibactam     | 8 MIC                      | susceptible                | susceptible            |
+| 1           | amoxicillin clavulanic acid     | amoxicillin_clavulanate   | < 0.1 ug/mL                | susceptible                | non-susceptible        |
+| 1           | meropenem                      | meropenem                 | intermediate               | intermediate               | intermediate           |
+| 1           | ampicillin 500mg               | ampicillin                | > 0.5 ug/mL                | resistant                  | NA                     |
+| 2           | unasyn                         | ampicillin_sulbactam      | susceptible dose dependent | susceptible                | susceptible            |
+| 2           | Ertapenem                      | ertapenem                 | not reported               | NA                         | NA                     |
+| 2           | Vancomycin (non-Cdiff)         | vancomycin                | > 0.25 ug/mL               | non susceptible, caution   | non-susceptible        |
 
 ## Therapy Details [Anchor](https://clif-consortium.github.io/website/data-dictionary/data-dictionary-2.1.0.html\#therapy-details)
 

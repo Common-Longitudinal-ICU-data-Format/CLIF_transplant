@@ -16,6 +16,7 @@
 !CLAUDE.md
 !requirements.txt
 !setup_env.sh
+!utils/load_config.py
 
 # Always ignore these file types regardless of location
 **/*.pyc

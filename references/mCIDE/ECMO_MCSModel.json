@@ -1,0 +1,110 @@
+{
+    "table_name": "ecmo_mcs",
+    "columns": [
+        {
+            "name": "hospitalization_id",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "recorded_dttm",
+            "data_type": "DATETIME",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "device_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "device_category",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": []
+        },
+        {
+            "name": "mcs_group",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": true,
+            "permissible_values": [
+                "durable_LVAD",
+                "temporary_LVAD",
+                "RVAD",
+                "IABP",
+                "ECMO"
+            ]
+        },
+        {
+            "name": "side",
+            "data_type": "VARCHAR",
+            "required": false,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": [
+                "right",
+                "left",
+                "both"
+            ]
+        },
+        {
+            "name": "device_metric_name",
+            "data_type": "VARCHAR",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "device_rate",
+            "data_type": "DOUBLE",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "flow",
+            "data_type": "DOUBLE",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "sweep",
+            "data_type": "DOUBLE",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "fdO2",
+            "data_type": "DOUBLE",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        }
+    ],
+    "required_columns": [
+        "hospitalization_id",
+        "recorded_dttm",
+        "device_name",
+        "device_category",
+        "mcs_group"
+    ],
+    "category_columns": [
+        "device_category",
+        "mcs_group",
+        "side"
+    ],
+    "group_columns": [
+        "mcs_group"
+    ]
+}

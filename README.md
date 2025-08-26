@@ -23,6 +23,8 @@ the following 2.1 tables are required
 8. **crrt_therapy**
 9. **ecmo_mcs**
 10. **patient_procedure**
+11. **microbiology_culture**
+12. **microbiology_susceptibilty**
 
 ## Cohort identification
 

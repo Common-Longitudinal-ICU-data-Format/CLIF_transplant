@@ -1,0 +1,114 @@
+{
+    "table_name": "medication_admin_intermittent",
+    "columns": [
+        {
+            "name": "hospitalization_id",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "med_order_id",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "admin_dttm",
+            "data_type": "DATETIME",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "med_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "med_category",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": []
+        },
+        {
+            "name": "med_group",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": true,
+            "permissible_values": []
+        },
+        {
+            "name": "med_route_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "med_route_category",
+            "data_type": "VARCHAR",
+            "required": false,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": []
+        },
+        {
+            "name": "med_dose",
+            "data_type": "DOUBLE",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "med_dose_unit",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "mar_action_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "mar_action_category",
+            "data_type": "VARCHAR",
+            "required": false,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": []
+        }
+    ],
+    "required_columns": [
+        "hospitalization_id",
+        "med_order_id",
+        "admin_dttm",
+        "med_name",
+        "med_category",
+        "med_group",
+        "med_route_name",
+        "med_dose",
+        "med_dose_unit",
+        "mar_action_name"
+    ],
+    "category_columns": [
+        "med_category",
+        "med_group",
+        "med_route_category",
+        "mar_action_category"
+    ],
+    "group_columns": [
+        "med_group"
+    ]
+}
