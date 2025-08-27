@@ -63,12 +63,11 @@ def _(Path, config, pd):
     valeos_labs_df = load_valeos_table('labs')
     valeos_respiratory_df = load_valeos_table('respiratory_support')
     valeos_med_continuous_df = load_valeos_table('medication_admin_continuous')
-    valeos_code_status_df = load_valeos_table('code_status')
+    
     
 
     return (
         site_name,
-        valeos_code_status_df,
         valeos_hospitalization_df,
         valeos_labs_df,
         valeos_med_continuous_df,
@@ -92,7 +91,6 @@ def _(mo, site_name):
 
 @app.cell
 def _(
-    valeos_code_status_df,
     valeos_labs_df,
     valeos_med_continuous_df,
     valeos_respiratory_df,
@@ -103,8 +101,7 @@ def _(
         'Vitals': valeos_vitals_df,
         'Labs': valeos_labs_df,
         'Respiratory Support': valeos_respiratory_df,
-        'Medication Admin (Continuous)': valeos_med_continuous_df,
-        'Code Status': valeos_code_status_df
+        'Medication Admin (Continuous)': valeos_med_continuous_df
     }
 
     print("=== CLINICAL DATA SUMMARY ===")
