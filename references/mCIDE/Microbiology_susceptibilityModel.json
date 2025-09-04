@@ -1,0 +1,67 @@
+{
+    "table_name": "microbiology_susceptibility",
+    "columns": [
+        {
+            "name": "organism_id",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "antibiotic_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "antibiotic_category",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": []
+        },
+        {
+            "name": "sensitivity_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "susceptibility_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "susceptibility_category",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": [
+                "susceptible",
+                "non-susceptible",
+                "intermediate",
+                "NA"
+            ]
+        }
+    ],
+    "required_columns": [
+        "organism_id",
+        "antibiotic_name",
+        "antibiotic_category",
+        "sensitivity_name",
+        "susceptibility_name",
+        "susceptibility_category"
+    ],
+    "category_columns": [
+        "antibiotic_category",
+        "susceptibility_category"
+    ],
+    "group_columns": []
+}

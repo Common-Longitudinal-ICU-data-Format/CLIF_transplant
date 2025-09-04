@@ -1,0 +1,54 @@
+{
+    "table_name": "admission_diagnosis",
+    "columns": [
+        {
+            "name": "patient_id",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "diagnostic_code",
+            "data_type": "DOUBLE",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "diagnosis_code_format",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": [
+                "icd9",
+                "icd10"
+            ]
+        },
+        {
+            "name": "start_dttm",
+            "data_type": "DATETIME",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "end_dttm",
+            "data_type": "DATETIME",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        }
+    ],
+    "required_columns": [
+        "patient_id",
+        "diagnostic_code",
+        "diagnosis_code_format",
+        "start_dttm"
+    ],
+    "category_columns": [
+        "diagnosis_code_format"
+    ],
+    "group_columns": []
+}

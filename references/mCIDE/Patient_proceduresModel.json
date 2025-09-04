@@ -1,0 +1,63 @@
+{
+    "table_name": "patient_procedures",
+    "columns": [
+        {
+            "name": "patient_id",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "hospitalization_id",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "provider_id",
+            "data_type": "VARCHAR",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "procedure_code",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "procedure_code_format",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": [
+                "CPT",
+                "ICD-10-PCS",
+                "SNOMED"
+            ]
+        },
+        {
+            "name": "recorded_dttm",
+            "data_type": "DATETIME",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        }
+    ],
+    "required_columns": [
+        "patient_id",
+        "hospitalization_id",
+        "procedure_code",
+        "procedure_code_format",
+        "recorded_dttm"
+    ],
+    "category_columns": [
+        "procedure_code_format"
+    ],
+    "group_columns": []
+}

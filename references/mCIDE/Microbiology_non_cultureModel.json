@@ -1,0 +1,156 @@
+{
+    "table_name": "microbiology_non_culture",
+    "columns": [
+        {
+            "name": "hospitalization_id",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "result_dttm",
+            "data_type": "DATETIME",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "collect_dttm",
+            "data_type": "DATETIME",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "order_dttm",
+            "data_type": "DATETIME",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "fluid_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "fluid_category",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": []
+        },
+        {
+            "name": "method_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "method_category",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": [
+                "culture",
+                "gram stain",
+                "smear"
+            ]
+        },
+        {
+            "name": "micro_order_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "organism_category",
+            "data_type": "VARCHAR",
+            "required": false,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": []
+        },
+        {
+            "name": "organism_group",
+            "data_type": "VARCHAR",
+            "required": false,
+            "is_category_column": true,
+            "is_group_column": true,
+            "permissible_values": []
+        },
+        {
+            "name": "result_name",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "result_category",
+            "data_type": "VARCHAR",
+            "required": true,
+            "is_category_column": true,
+            "is_group_column": false,
+            "permissible_values": []
+        },
+        {
+            "name": "reference_low",
+            "data_type": "DOUBLE",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "reference_high",
+            "data_type": "DOUBLE",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "result_units",
+            "data_type": "VARCHAR",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        },
+        {
+            "name": "lab_loinc_code",
+            "data_type": "VARCHAR",
+            "required": false,
+            "is_category_column": false,
+            "is_group_column": false
+        }
+    ],
+    "required_columns": [
+        "hospitalization_id",
+        "result_dttm",
+        "collect_dttm",
+        "order_dttm",
+        "fluid_name",
+        "fluid_category",
+        "method_name",
+        "method_category",
+        "micro_order_name",
+        "result_name",
+        "result_category"
+    ],
+    "category_columns": [
+        "fluid_category",
+        "method_category",
+        "organism_category",
+        "organism_group",
+        "result_category"
+    ],
+    "group_columns": [
+        "organism_group"
+    ]
+}
