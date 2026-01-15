@@ -9,6 +9,8 @@
 !outlier-thresholds/**
 !references/
 !references/**
+!public/
+!public/**
 
 # Exception: Always commit these specific files
 !.gitignore

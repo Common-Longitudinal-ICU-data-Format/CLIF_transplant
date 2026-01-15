@@ -1,0 +1,90 @@
+year,clif_site,CAN_LISTING_CTR_CD,ENTIRE_NAME,peds,ORG_TY,transplants
+2019,Emory,GAEM,Emory University Hospital,0,HR,36
+2019,JHU,MDJH,Johns Hopkins Hospital,0,HR,27
+2019,JHU,MDJH,Johns Hopkins Hospital,1,HR,2
+2019,Michigan,MIUM,University of Michigan Medical Center,0,HR,23
+2019,Michigan,MIUM,University of Michigan Medical Center,1,HR,14
+2019,NU,ILNM,Northwestern Memorial Hospital,0,HR,41
+2019,NU,ILNM,Northwestern Memorial Hospital,1,HR,1
+2019,Penn,PAUP,Hospital of the University of Pennsylvania,0,HL,2
+2019,Penn,PAUP,Hospital of the University of Pennsylvania,0,HR,57
+2019,UCMC,ILUC,University of Chicago Medical Center,0,HR,43
+2019,UCMC,ILUC,University of Chicago Medical Center,1,HR,3
+2019,UCSF,CAMB,UCSF Medical Center at Mission Bay,1,HR,3
+2019,UCSF,CASF,University of California San Francisco Medical Center,0,HR,24
+2019,UMN,MNUM,"University of Minnesota Medical Center, Fairview",0,HR,35
+2019,UMN,MNUM,"University of Minnesota Medical Center, Fairview",1,HR,10
+2020,Emory,GAEM,Emory University Hospital,0,HR,48
+2020,JHU,MDJH,Johns Hopkins Hospital,0,HR,20
+2020,Michigan,MIUM,University of Michigan Medical Center,0,HR,26
+2020,Michigan,MIUM,University of Michigan Medical Center,1,HR,22
+2020,NU,ILNM,Northwestern Memorial Hospital,0,HR,30
+2020,OHSU,ORUO,Oregon Health and Science University,0,HR,5
+2020,Penn,PAUP,Hospital of the University of Pennsylvania,0,HL,1
+2020,Penn,PAUP,Hospital of the University of Pennsylvania,0,HR,54
+2020,UCMC,ILUC,University of Chicago Medical Center,0,HR,44
+2020,UCMC,ILUC,University of Chicago Medical Center,1,HR,1
+2020,UCSF,CAMB,UCSF Medical Center at Mission Bay,1,HR,6
+2020,UCSF,CASF,University of California San Francisco Medical Center,0,HR,17
+2020,UMN,MNUM,"University of Minnesota Medical Center, Fairview",0,HR,29
+2020,UMN,MNUM,"University of Minnesota Medical Center, Fairview",1,HR,13
+2021,Emory,GAEM,Emory University Hospital,0,HR,40
+2021,JHU,MDJH,Johns Hopkins Hospital,0,HR,19
+2021,JHU,MDJH,Johns Hopkins Hospital,1,HR,3
+2021,Michigan,MIUM,University of Michigan Medical Center,0,HR,24
+2021,Michigan,MIUM,University of Michigan Medical Center,1,HR,15
+2021,NU,ILNM,Northwestern Memorial Hospital,0,HL,1
+2021,NU,ILNM,Northwestern Memorial Hospital,0,HR,30
+2021,OHSU,ORUO,Oregon Health and Science University,0,HR,7
+2021,Penn,PAUP,Hospital of the University of Pennsylvania,0,HR,44
+2021,UCMC,ILUC,University of Chicago Medical Center,0,HR,59
+2021,UCMC,ILUC,University of Chicago Medical Center,1,HR,2
+2021,UCSF,CAMB,UCSF Medical Center at Mission Bay,1,HR,2
+2021,UCSF,CASF,University of California San Francisco Medical Center,0,HL,1
+2021,UCSF,CASF,University of California San Francisco Medical Center,0,HR,26
+2021,UMN,MNUM,"University of Minnesota Medical Center, Fairview",0,HR,24
+2022,Emory,GAEM,Emory University Hospital,0,HR,55
+2022,JHU,MDJH,Johns Hopkins Hospital,0,HR,18
+2022,Michigan,MIUM,University of Michigan Medical Center,0,HR,23
+2022,Michigan,MIUM,University of Michigan Medical Center,1,HR,12
+2022,NU,ILNM,Northwestern Memorial Hospital,0,HR,38
+2022,OHSU,ORUO,Oregon Health and Science University,0,HR,14
+2022,Penn,PAUP,Hospital of the University of Pennsylvania,0,HR,44
+2022,UCMC,ILUC,University of Chicago Medical Center,0,HR,65
+2022,UCMC,ILUC,University of Chicago Medical Center,1,HR,1
+2022,UCSF,CAMB,UCSF Medical Center at Mission Bay,1,HR,1
+2022,UCSF,CASF,University of California San Francisco Medical Center,0,HL,1
+2022,UCSF,CASF,University of California San Francisco Medical Center,0,HR,47
+2022,UCSF,CASF,University of California San Francisco Medical Center,1,HL,1
+2022,UMN,MNUM,"University of Minnesota Medical Center, Fairview",0,HR,25
+2023,Emory,GAEM,Emory University Hospital,0,HL,1
+2023,Emory,GAEM,Emory University Hospital,0,HR,61
+2023,JHU,MDJH,Johns Hopkins Hospital,0,HR,24
+2023,JHU,MDJH,Johns Hopkins Hospital,1,HR,4
+2023,Michigan,MIUM,University of Michigan Medical Center,0,HR,37
+2023,Michigan,MIUM,University of Michigan Medical Center,1,HR,20
+2023,NU,ILNM,Northwestern Memorial Hospital,0,HR,37
+2023,OHSU,ORUO,Oregon Health and Science University,0,HR,13
+2023,Penn,PAUP,Hospital of the University of Pennsylvania,0,HR,39
+2023,UCMC,ILUC,University of Chicago Medical Center,0,HR,59
+2023,UCSF,CAMB,UCSF Medical Center at Mission Bay,1,HR,5
+2023,UCSF,CASF,University of California San Francisco Medical Center,0,HL,1
+2023,UCSF,CASF,University of California San Francisco Medical Center,0,HR,77
+2023,UCSF,CASF,University of California San Francisco Medical Center,1,HL,1
+2023,UMN,MNUM,"University of Minnesota Medical Center, Fairview",0,HR,37
+2023,UMN,MNUM,"University of Minnesota Medical Center, Fairview",1,HR,5
+2024,Emory,GAEM,Emory University Hospital,0,HR,64
+2024,JHU,MDJH,Johns Hopkins Hospital,0,HR,65
+2024,JHU,MDJH,Johns Hopkins Hospital,1,HR,3
+2024,Michigan,MIUM,University of Michigan Medical Center,0,HR,23
+2024,Michigan,MIUM,University of Michigan Medical Center,1,HR,16
+2024,NU,ILNM,Northwestern Memorial Hospital,0,HR,45
+2024,OHSU,ORUO,Oregon Health and Science University,0,HR,18
+2024,Penn,PAUP,Hospital of the University of Pennsylvania,0,HR,41
+2024,UCMC,ILUC,University of Chicago Medical Center,0,HL,1
+2024,UCMC,ILUC,University of Chicago Medical Center,0,HR,58
+2024,UCSF,CAMB,UCSF Medical Center at Mission Bay,1,HR,2
+2024,UCSF,CASF,University of California San Francisco Medical Center,0,HL,1
+2024,UCSF,CASF,University of California San Francisco Medical Center,0,HR,74
+2024,UMN,MNUM,"University of Minnesota Medical Center, Fairview",0,HR,28
+2024,UMN,MNUM,"University of Minnesota Medical Center, Fairview",1,HR,3
