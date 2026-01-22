@@ -1,12 +1,14 @@
 import marimo
 
-__generated_with = "0.14.17"
+__generated_with = "0.19.4"
 app = marimo.App(width="columns")
 
 
-@app.cell(column=0)
+@app.cell(column=0, hide_code=True)
 def _(mo):
-    mo.md("""# Setup & Configuration""")
+    mo.md("""
+    # Setup and Load Data
+    """)
     return
 
 
@@ -45,7 +47,6 @@ def _():
     SUPPRESSION_THRESHOLD = 10
     return (
         CrrtTherapy,
-        EcmoMcs,
         HEART_TRANSPLANT_CPTS,
         Hospitalization,
         Labs,
@@ -130,7 +131,7 @@ def _(SUPPRESSION_THRESHOLD):
 
 
 @app.cell
-def _(Hospitalization, Path, Patient, config):
+def _(Hospitalization, Path, Patient, PatientProcedures, config):
     # Setup paths and load core tables using clifpy
     tables_path = Path(config['tables_path'])
     output_dir = tables_path.parent / 'output' / 'final'
@@ -144,11 +145,9 @@ def _(Hospitalization, Path, Patient, config):
             filetype=file_type,
             timezone='UTC'
         )
-        heart_patient_df = patient_table.df
-        print(f"Loaded patient via clifpy: {len(heart_patient_df):,} records")
+        print(f"Loaded patient via clifpy: {patient_table.df['patient_id'].nunique():,} unique patients")
     except Exception as e:
         print(f"Error loading patient table: {e}")
-        heart_patient_df = None
 
     # Load Hospitalization table using clifpy
     try:
@@ -157,158 +156,176 @@ def _(Hospitalization, Path, Patient, config):
             filetype=file_type,
             timezone='UTC'
         )
-        heart_hospitalization_df = hosp_table.df
-        print(f"Loaded hospitalization via clifpy: {len(heart_hospitalization_df):,} records")
+        print(f"Loaded hospitalization via clifpy: {hosp_table.df['hospitalization_id'].nunique():,} unique hospitalizations")
     except Exception as e:
         print(f"Error loading hospitalization table: {e}")
-        heart_hospitalization_df = None
+
+
+    try:
+        proc_table = PatientProcedures.from_file(
+        data_directory=str(tables_path),
+        filetype=file_type,
+        timezone='UTC'
+        )
+        print(f"Loaded procedures via clifpy: {proc_table.df['hospitalization_id'].nunique():,} unique hospitalizations")
+    except Exception as e:
+        print(f"Error loading procedures table: {e}")
     return (
         file_type,
-        heart_hospitalization_df,
-        heart_patient_df,
+        hosp_table,
         output_dir,
+        proc_table,
         site_name,
         tables_path,
     )
 
 
-@app.cell(column=1)
+@app.cell(column=1, hide_code=True)
 def _(mo):
-    mo.md("""# Data Loading & Cohort Identification""")
+    mo.md("""
+    # Cohort Identification and Registry Comparison
+    """)
     return
 
 
 @app.cell
-def _(heart_transplant_df, pd):
-    # Filter to heart transplants only
-    if heart_transplant_df is not None:
-        heart_only_df = heart_transplant_df[
-            heart_transplant_df['transplant_type'] == 'heart'
-        ].copy()
-        heart_only_df['transplant_date'] = pd.to_datetime(
-            heart_only_df['transplant_date'], utc=True
-        )
-        heart_patient_ids = heart_only_df['patient_id'].unique()
-        total_heart_n = len(heart_patient_ids)
-        print(f"Heart transplant patients: {total_heart_n}")
-    else:
-        heart_only_df = None
-        heart_patient_ids = []
-        total_heart_n = 0
-        print("No transplant data available")
-    return heart_only_df, heart_patient_ids, total_heart_n
+def _(HEART_TRANSPLANT_CPTS, proc_table):
+    _heart_procedures_df = proc_table.df[
+        proc_table.df['procedure_code'].astype(str).isin(HEART_TRANSPLANT_CPTS)
+        & proc_table.df['procedure_code_format'].astype(str).str.lower().eq('cpt')
+    ].copy()
+
+    # Deduplicate by code, hospitalization_id, and procedure_billed_dttm
+    _before = len(_heart_procedures_df)
+    heart_procedures_df = _heart_procedures_df.drop_duplicates(
+        subset=['procedure_code', 'hospitalization_id', 'procedure_billed_dttm']
+    )
+    heart_procedures_df = heart_procedures_df.rename(
+        columns={'procedure_billed_dttm': 'apprx_transplant_date'}
+    )
+    print(f"Unique heart transplant hospitalization procedures found: {heart_procedures_df['hospitalization_id'].nunique():,} (removed {_before - _heart_procedures_df['hospitalization_id'].nunique():,} duplicates)")
+    heart_procedures_df
+    return (heart_procedures_df,)
 
 
 @app.cell
-def _(heart_hospitalization_df, heart_only_df, heart_patient_ids, pd):
-    # Get hospitalization IDs for heart transplant patients
-    if heart_hospitalization_df is not None and len(heart_patient_ids) > 0:
-        # Filter hospitalizations to heart transplant patients
-        heart_hosp_df = heart_hospitalization_df[
-            heart_hospitalization_df['patient_id'].isin(heart_patient_ids)
-        ].copy()
+def _(heart_procedures_df, hosp_table):
+    _heart_hosp_ids = heart_procedures_df['hospitalization_id'].unique()
+    heart_hosp_df = hosp_table.df[
+        hosp_table.df['hospitalization_id'].isin(_heart_hosp_ids)
+    ].copy()
 
-        # Convert datetime columns
-        heart_hosp_df['admission_dttm'] = pd.to_datetime(
-            heart_hosp_df['admission_dttm'], utc=True
-        )
-        heart_hosp_df['discharge_dttm'] = pd.to_datetime(
-            heart_hosp_df['discharge_dttm'], utc=True
-        )
+    print(f"Heart transplant hospitalizations in CLIF: {len(heart_hosp_df):,} total hospitalization records in heart_hosp_df for {len(_heart_hosp_ids):,} unique heart transplant procedure hospitalization_ids")
 
-        # Merge with transplant data to get transplant hospitalization
-        heart_hosp_merged = pd.merge(
-            heart_hosp_df,
-            heart_only_df[['patient_id', 'transplant_date']],
-            on='patient_id',
-            how='inner'
-        )
+    heart_hosp_ids = set(heart_procedures_df['hospitalization_id'].unique())
+    hosp_ids = set(hosp_table.df['hospitalization_id'].unique())
 
-        # Find the hospitalization containing the transplant
-        heart_transplant_hosp = heart_hosp_merged[
-            (heart_hosp_merged['admission_dttm'] <= heart_hosp_merged['transplant_date']) &
-            (heart_hosp_merged['discharge_dttm'] >= heart_hosp_merged['transplant_date'])
-        ].copy()
+    missing_hosp_ids = heart_hosp_ids - hosp_ids
 
-        heart_hosp_ids = heart_transplant_hosp['hospitalization_id'].unique()
-        print(f"Heart transplant hospitalizations: {len(heart_hosp_ids)}")
-    else:
-        heart_hosp_df = None
-        heart_hosp_merged = None
-        heart_transplant_hosp = None
-        heart_hosp_ids = []
-        print("No hospitalization data available")
-    return heart_hosp_ids, heart_transplant_hosp
+    print(
+        f"Heart transplant hospitalization_ids from procedures NOT in hospitalization table: "
+        f"{len(missing_hosp_ids):,}"
+    )
+
+    # If no direct matches, try date-based matching
+    if len(heart_hosp_df) == 0:
+        print("\nNo direct hospitalization_id matches found. Attempting date-based matching...")
+
+        # Get unique procedure hospitalization_ids with transplant dates
+        procs_for_matching = heart_procedures_df[['hospitalization_id', 'apprx_transplant_date']].drop_duplicates('hospitalization_id').copy()
+
+        # Prepare hospitalization table with datetime columns
+        hosp_for_matching = hosp_table.df[['hospitalization_id', 'admission_dttm', 'discharge_dttm']].drop_duplicates('hospitalization_id').copy()
+
+        # Cross join procedures with hospitalizations, then filter by date overlap
+        procs_for_matching['_key'] = 1
+        hosp_for_matching['_key'] = 1
+        merged = procs_for_matching.merge(hosp_for_matching, on='_key', suffixes=('_proc', '_hosp')).drop('_key', axis=1)
+
+        # Filter to hospitalizations where transplant date falls within admission-discharge window
+        date_matches = merged[
+            (merged['apprx_transplant_date'] >= merged['admission_dttm']) &
+            (merged['apprx_transplant_date'] <= merged['discharge_dttm'])
+        ]
+
+        # Count matches per procedure hospitalization_id
+        match_counts = date_matches.groupby('hospitalization_id_proc')['hospitalization_id_hosp'].nunique().reset_index()
+        match_counts.columns = ['proc_hospitalization_id', 'n_matches']
+
+        # Get all procedure hospitalization_ids
+        all_proc_hosp_ids = set(procs_for_matching['hospitalization_id'].unique())
+        matched_proc_hosp_ids = set(match_counts['proc_hospitalization_id'].unique())
+
+        # Calculate summary statistics
+        n_zero_matches = len(all_proc_hosp_ids - matched_proc_hosp_ids)
+        n_one_match = len(match_counts[match_counts['n_matches'] == 1])
+        n_multiple_matches = len(match_counts[match_counts['n_matches'] > 1])
+
+        print(f"\nDate-based matching summary (transplant date between admission and discharge):")
+        print(f"  - Procedure hospitalization_ids with 0 matches:  {n_zero_matches:,}")
+        print(f"  - Procedure hospitalization_ids with 1 match:    {n_one_match:,}")
+        print(f"  - Procedure hospitalization_ids with >1 matches: {n_multiple_matches:,}")
+
+    match_counts
+    return heart_hosp_df, heart_hosp_ids
 
 
 @app.cell
-def _(
-    HEART_TRANSPLANT_CPTS,
-    PatientProcedures,
-    file_type,
-    heart_hospitalization_df,
-    pd,
-    tables_path,
-):
-    # Load Procedure table and identify heart transplants via CPT codes
-    try:
-        proc_table = PatientProcedures.from_file(
-            data_directory=str(tables_path),
-            filetype=file_type,
-            timezone='UTC'
+def _(heart_hosp_df, heart_procedures_df, pd):
+    heart_hosp_w_tx_dttm = heart_hosp_df[['patient_id', 'hospitalization_id']].merge(
+        heart_procedures_df[['hospitalization_id', 'apprx_transplant_date']], 
+        how='left', 
+        on='hospitalization_id')
+
+    heart_hosp_w_tx_dttm['tx_year'] = (
+        pd.to_datetime(
+            heart_hosp_w_tx_dttm['apprx_transplant_date'],
+            errors='coerce'
         )
-        procedures_df = proc_table.df
-        print(f"Loaded procedures via clifpy: {len(procedures_df):,} records")
+        .dt.year
+    )
 
-        # Filter to heart transplant CPT codes
-        heart_procedures = procedures_df[
-            procedures_df['procedure_code'].astype(str).isin(HEART_TRANSPLANT_CPTS)
-        ].copy()
+    tx_patients_by_year = (
+        heart_hosp_w_tx_dttm
+        .dropna(subset=['tx_year'])
+        .sort_values('apprx_transplant_date')
+        .drop_duplicates('patient_id')   # ← key change
+        .groupby('tx_year')['patient_id']
+        .nunique()
+        .rename('n_patients')
+        .reset_index()
+    )
 
-        if len(heart_procedures) > 0:
-            # Create transplant records with patient_id, hospitalization_id, and transplant_date
-            heart_transplant_df = heart_procedures[['hospitalization_id', 'procedure_billed_dttm']].copy()
-            heart_transplant_df = heart_transplant_df.rename(columns={'procedure_billed_dttm': 'transplant_date'})
-
-            # Merge with hospitalization to get patient_id
-            if heart_hospitalization_df is not None:
-                heart_transplant_df = pd.merge(
-                    heart_transplant_df,
-                    heart_hospitalization_df[['hospitalization_id', 'patient_id']],
-                    on='hospitalization_id',
-                    how='inner'
-                )
-            heart_transplant_df['transplant_type'] = 'heart'
-            print(f"Found heart transplants via CPT codes: {len(heart_transplant_df):,} procedures")
-        else:
-            heart_transplant_df = None
-            print("No heart transplant CPT codes found in procedures")
-    except Exception as e:
-        print(f"Error loading procedures: {e}")
-        heart_transplant_df = None
-    return (heart_transplant_df,)
+    tx_patients_by_year
+    return (heart_hosp_w_tx_dttm,)
 
 
-@app.cell(column=2)
+@app.cell(column=2, hide_code=True)
 def _(mo):
-    mo.md("""# Clinical Data & Perioperative Filtering""")
+    mo.md("""
+    # Clinical Data & Perioperative Filtering
+    """)
     return
 
 
 @app.cell
 def _(
     CrrtTherapy,
-    EcmoMcs,
     Labs,
     MedicationAdminContinuous,
     RespiratorySupport,
     Vitals,
     file_type,
-    heart_hosp_ids,
+    heart_hosp_w_tx_dttm,
     tables_path,
 ):
     # Load clinical tables using clifpy with hospitalization_id filters
-    heart_hosp_ids_list = list(heart_hosp_ids) if len(heart_hosp_ids) > 0 else []
+    heart_hosp_ids_list = (
+        heart_hosp_w_tx_dttm['hospitalization_id'].tolist()
+        if not heart_hosp_w_tx_dttm.empty
+        else []
+    )
+
 
     # Load Vitals using clifpy
     if len(heart_hosp_ids_list) > 0:
@@ -367,19 +384,19 @@ def _(
             print(f"Error loading respiratory: {e}")
             heart_respiratory_df = None
 
-        # Load ECMO/MCS using clifpy
-        try:
-            ecmo_table = EcmoMcs.from_file(
-                data_directory=str(tables_path),
-                filetype=file_type,
-                timezone='UTC',
-                filters={'hospitalization_id': heart_hosp_ids_list}
-            )
-            heart_ecmo_df = ecmo_table.df
-            print(f"Loaded ECMO via clifpy: {len(heart_ecmo_df):,} records")
-        except Exception as e:
-            print(f"ECMO table not available: {e}")
-            heart_ecmo_df = None
+        # # Load ECMO/MCS using clifpy
+        # try:
+        #     ecmo_table = EcmoMcs.from_file(
+        #         data_directory=str(tables_path),
+        #         filetype=file_type,
+        #         timezone='UTC',
+        #         filters={'hospitalization_id': heart_hosp_ids_list}
+        #     )
+        #     heart_ecmo_df = ecmo_table.df
+        #     print(f"Loaded ECMO via clifpy: {len(heart_ecmo_df):,} records")
+        # except Exception as e:
+        #     print(f"ECMO table not available: {e}")
+        #     heart_ecmo_df = None
 
         # Load CRRT using clifpy
         try:
@@ -575,14 +592,16 @@ def _(
     return (periop_resp_df,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     return
 
 
-@app.cell(column=3)
+@app.cell(column=3, hide_code=True)
 def _(mo):
-    mo.md("""# Report & Visualizations""")
+    mo.md("""
+    # Report & Visualizations # TO-DO
+    """)
     return
 
 
@@ -615,57 +634,75 @@ def _(datetime, heart_only_df, mo, site_name, suppress_count, total_heart_n):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("""## Patient Demographics""")
+    mo.md("""
+    ## Patient Demographics
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("""## Transplant Volume""")
+    mo.md("""
+    ## Transplant Volume
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("""## Perioperative Vitals (±14 days from transplant)""")
+    mo.md("""
+    ## Perioperative Vitals (±14 days from transplant)
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("""## Perioperative Labs (±14 days from transplant)""")
+    mo.md("""
+    ## Perioperative Labs (±14 days from transplant)
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("""## Vasoactive Medication Use (±14 days from transplant)""")
+    mo.md("""
+    ## Vasoactive Medication Use (±14 days from transplant)
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("""## Respiratory Support (±14 days from transplant)""")
+    mo.md("""
+    ## Respiratory Support (±14 days from transplant)
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("""## Advanced Therapies""")
+    mo.md("""
+    ## Advanced Therapies
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("""## Outcomes""")
+    mo.md("""
+    ## Outcomes
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("""## Export Federated Results""")
+    mo.md("""
+    ## Export Federated Results
+    """)
     return
 
 
@@ -1361,18 +1398,12 @@ def _(heart_procedures_df, pd):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     return
 
 
-@app.cell(column=4)
-def _(mo):
-    mo.md("""# Debug & Registry Comparison""")
-    return
-
-
-@app.cell
+@app.cell(hide_code=True)
 def _():
     return
 
