@@ -58,12 +58,26 @@ Follow instructions in the [config/README.md](config/README.md) file for detaile
 
 ## 2. Set up the project environment
 
-Open your terminal and run the setup script:
-```
-source ./setup_env.sh
+### Option A: Using uv (recommended)
+
+[uv](https://docs.astral.sh/uv/) is a fast Python package manager. Install it first:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-This will create and activate the virtual environment in your current shell session.
+Then install dependencies and run code:
+```bash
+uv sync
+uv run marimo edit code/heart_transplant_report.py
+```
+
+### Option B: Using traditional venv
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
 ## 3. Run code
 Detailed instructions on the code workflow are provided in the [code directory](code/README.md)

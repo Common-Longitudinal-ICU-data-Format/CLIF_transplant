@@ -1,10 +1,16 @@
 import marimo
 
-__generated_with = "0.15.3"
+__generated_with = "0.14.17"
 app = marimo.App(width="columns")
 
 
 @app.cell(column=0)
+def _(mo):
+    mo.md("""# Setup & Configuration""")
+    return
+
+
+@app.cell
 def _():
     import marimo as mo
     import pandas as pd
@@ -70,80 +76,106 @@ def _(load_config):
 
 
 @app.cell
-def _(HEART_TRANSPLANT_CPTS, Path, PatientProcedures, config):
-    # Debug: Load and display heart transplant procedures
-    _tables_path = Path(config['tables_path'])
-    _file_type = config.get('file_type', 'parquet')
+def _(SUPPRESSION_THRESHOLD):
+    # Suppression helper functions for small cell protection
 
-    _proc_table = PatientProcedures.from_file(
-        data_directory=str(_tables_path),
-        filetype=_file_type,
-        timezone='UTC'
+    def suppress_count(count, threshold=SUPPRESSION_THRESHOLD):
+        """Return suppressed string if count < threshold"""
+        if count < threshold:
+            return "< 10"
+        return str(count)
+
+    def suppress_value(count, value, threshold=SUPPRESSION_THRESHOLD):
+        """Return value or suppressed marker based on count"""
+        if count < threshold:
+            return "--"
+        return value
+
+    def format_count_pct(count, total, threshold=SUPPRESSION_THRESHOLD):
+        """Format as 'N (%)' with suppression"""
+        if count < threshold:
+            return "< 10 (--)"
+        if total == 0:
+            return f"{count} (--)"
+        pct = (count / total * 100)
+        return f"{count} ({pct:.1f}%)"
+
+    def is_suppressed(count, threshold=SUPPRESSION_THRESHOLD):
+        """Check if count should be suppressed"""
+        return count < threshold
+
+    def format_median_iqr(series, count, threshold=SUPPRESSION_THRESHOLD):
+        """Format median [IQR] with suppression"""
+        if count < threshold or len(series) == 0:
+            return "--"
+        median = series.median()
+        q25 = series.quantile(0.25)
+        q75 = series.quantile(0.75)
+        return f"{median:.1f} [{q25:.1f}-{q75:.1f}]"
+
+    def format_mean_sd(series, count, threshold=SUPPRESSION_THRESHOLD):
+        """Format mean ± SD with suppression"""
+        if count < threshold or len(series) == 0:
+            return "--"
+        mean = series.mean()
+        std = series.std()
+        return f"{mean:.1f} ± {std:.1f}"
+    return (
+        format_count_pct,
+        format_mean_sd,
+        format_median_iqr,
+        is_suppressed,
+        suppress_count,
     )
-
-    heart_procedures_df = _proc_table.df[
-        _proc_table.df['procedure_code'].astype(str).isin(HEART_TRANSPLANT_CPTS)
-    ].copy()
-
-    # Deduplicate by code, hospitalization_id, and procedure_billed_dttm
-    _before = len(heart_procedures_df)
-    heart_procedures_df = heart_procedures_df.drop_duplicates(
-        subset=['procedure_code', 'hospitalization_id', 'procedure_billed_dttm']
-    )
-    print(f"Heart transplant procedures found: {len(heart_procedures_df):,} (removed {_before - len(heart_procedures_df):,} duplicates)")
-    heart_procedures_df
-    return (heart_procedures_df,)
 
 
 @app.cell
-def _(Hospitalization, Path, config, heart_procedures_df):
-    # Filter hospitalization table to heart transplant hospitalization_ids
-    _tables_path = Path(config['tables_path'])
-    _file_type = config.get('file_type', 'parquet')
+def _(Hospitalization, Path, Patient, config):
+    # Setup paths and load core tables using clifpy
+    tables_path = Path(config['tables_path'])
+    output_dir = tables_path.parent / 'output' / 'final'
+    site_name = config['site_name']
+    file_type = config.get('file_type', 'parquet')
 
-    _hosp_table = Hospitalization.from_file(
-        data_directory=str(_tables_path),
-        filetype=_file_type,
-        timezone='UTC'
+    # Load Patient table using clifpy
+    try:
+        patient_table = Patient.from_file(
+            data_directory=str(tables_path),
+            filetype=file_type,
+            timezone='UTC'
+        )
+        heart_patient_df = patient_table.df
+        print(f"Loaded patient via clifpy: {len(heart_patient_df):,} records")
+    except Exception as e:
+        print(f"Error loading patient table: {e}")
+        heart_patient_df = None
+
+    # Load Hospitalization table using clifpy
+    try:
+        hosp_table = Hospitalization.from_file(
+            data_directory=str(tables_path),
+            filetype=file_type,
+            timezone='UTC'
+        )
+        heart_hospitalization_df = hosp_table.df
+        print(f"Loaded hospitalization via clifpy: {len(heart_hospitalization_df):,} records")
+    except Exception as e:
+        print(f"Error loading hospitalization table: {e}")
+        heart_hospitalization_df = None
+    return (
+        file_type,
+        heart_hospitalization_df,
+        heart_patient_df,
+        output_dir,
+        site_name,
+        tables_path,
     )
 
-    _heart_hosp_ids = heart_procedures_df['hospitalization_id'].unique()
-    heart_hosp_df = _hosp_table.df[
-        _hosp_table.df['hospitalization_id'].isin(_heart_hosp_ids)
-    ].copy()
 
-    print(f"Heart transplant hospitalizations in CLIF: {len(heart_hosp_df):,} of {len(_heart_hosp_ids):,} procedure hospitalization_ids")
-    heart_hosp_df
-    return (heart_hosp_df,)
-
-
-@app.cell
-def _(Path, pd, config):
-    # Load national registry data filtered by site_name
-    _registry_path = Path(__file__).resolve().parent.parent / 'public' / 'data' / 'clif_hr_tx_counts.csv'
-    _registry_df = pd.read_csv(_registry_path)
-
-    _site_name = config['site_name']
-    registry_ucmc_df = _registry_df[
-        (_registry_df['clif_site'] == _site_name) &
-        (_registry_df['ORG_TY'] == 'HR')
-    ].copy()
-
-    print(f"National Registry Heart Transplants for {_site_name}:")
-    registry_ucmc_df
-    return (registry_ucmc_df,)
-
-
-@app.cell
-def _(heart_procedures_df, pd):
-    # Group heart procedures by year for comparison with registry
-    _df = heart_procedures_df.copy()
-    _df['year'] = pd.to_datetime(_df['procedure_billed_dttm']).dt.year
-
-    clif_by_year = _df.groupby('year').size().reset_index(name='clif_count')
-    print("CLIF Heart Transplant Procedures by Year:")
-    clif_by_year
-    return (clif_by_year,)
+@app.cell(column=1)
+def _(mo):
+    mo.md("""# Data Loading & Cohort Identification""")
+    return
 
 
 @app.cell
@@ -207,6 +239,60 @@ def _(heart_hospitalization_df, heart_only_df, heart_patient_ids, pd):
         heart_hosp_ids = []
         print("No hospitalization data available")
     return heart_hosp_ids, heart_transplant_hosp
+
+
+@app.cell
+def _(
+    HEART_TRANSPLANT_CPTS,
+    PatientProcedures,
+    file_type,
+    heart_hospitalization_df,
+    pd,
+    tables_path,
+):
+    # Load Procedure table and identify heart transplants via CPT codes
+    try:
+        proc_table = PatientProcedures.from_file(
+            data_directory=str(tables_path),
+            filetype=file_type,
+            timezone='UTC'
+        )
+        procedures_df = proc_table.df
+        print(f"Loaded procedures via clifpy: {len(procedures_df):,} records")
+
+        # Filter to heart transplant CPT codes
+        heart_procedures = procedures_df[
+            procedures_df['procedure_code'].astype(str).isin(HEART_TRANSPLANT_CPTS)
+        ].copy()
+
+        if len(heart_procedures) > 0:
+            # Create transplant records with patient_id, hospitalization_id, and transplant_date
+            heart_transplant_df = heart_procedures[['hospitalization_id', 'procedure_billed_dttm']].copy()
+            heart_transplant_df = heart_transplant_df.rename(columns={'procedure_billed_dttm': 'transplant_date'})
+
+            # Merge with hospitalization to get patient_id
+            if heart_hospitalization_df is not None:
+                heart_transplant_df = pd.merge(
+                    heart_transplant_df,
+                    heart_hospitalization_df[['hospitalization_id', 'patient_id']],
+                    on='hospitalization_id',
+                    how='inner'
+                )
+            heart_transplant_df['transplant_type'] = 'heart'
+            print(f"Found heart transplants via CPT codes: {len(heart_transplant_df):,} procedures")
+        else:
+            heart_transplant_df = None
+            print("No heart transplant CPT codes found in procedures")
+    except Exception as e:
+        print(f"Error loading procedures: {e}")
+        heart_transplant_df = None
+    return (heart_transplant_df,)
+
+
+@app.cell(column=2)
+def _(mo):
+    mo.md("""# Clinical Data & Perioperative Filtering""")
+    return
 
 
 @app.cell
@@ -327,57 +413,177 @@ def _(
 
 
 @app.cell
-def _(SUPPRESSION_THRESHOLD):
-    # Suppression helper functions for small cell protection
+def _(heart_hosp_ids, heart_transplant_hosp, heart_vitals_df, pd):
+    # Filter vitals to perioperative window (±14 days)
+    PERIOP_DAYS = 14
 
-    def suppress_count(count, threshold=SUPPRESSION_THRESHOLD):
-        """Return suppressed string if count < threshold"""
-        if count < threshold:
-            return "< 10"
-        return str(count)
+    if heart_vitals_df is not None and len(heart_hosp_ids) > 0:
+        # Filter to heart transplant hospitalizations
+        periop_vitals_df = heart_vitals_df[
+            heart_vitals_df['hospitalization_id'].isin(heart_hosp_ids)
+        ].copy()
 
-    def suppress_value(count, value, threshold=SUPPRESSION_THRESHOLD):
-        """Return value or suppressed marker based on count"""
-        if count < threshold:
-            return "--"
-        return value
+        # Convert datetime
+        periop_vitals_df['recorded_dttm'] = pd.to_datetime(
+            periop_vitals_df['recorded_dttm'], utc=True
+        )
 
-    def format_count_pct(count, total, threshold=SUPPRESSION_THRESHOLD):
-        """Format as 'N (%)' with suppression"""
-        if count < threshold:
-            return "< 10 (--)"
-        if total == 0:
-            return f"{count} (--)"
-        pct = (count / total * 100)
-        return f"{count} ({pct:.1f}%)"
+        # Merge with transplant dates
+        periop_vitals_df = pd.merge(
+            periop_vitals_df,
+            heart_transplant_hosp[['hospitalization_id', 'transplant_date']],
+            on='hospitalization_id',
+            how='inner'
+        )
 
-    def is_suppressed(count, threshold=SUPPRESSION_THRESHOLD):
-        """Check if count should be suppressed"""
-        return count < threshold
+        # Calculate days from transplant
+        periop_vitals_df['days_from_transplant'] = (
+            periop_vitals_df['recorded_dttm'] - periop_vitals_df['transplant_date']
+        ).dt.total_seconds() / (24 * 3600)
 
-    def format_median_iqr(series, count, threshold=SUPPRESSION_THRESHOLD):
-        """Format median [IQR] with suppression"""
-        if count < threshold or len(series) == 0:
-            return "--"
-        median = series.median()
-        q25 = series.quantile(0.25)
-        q75 = series.quantile(0.75)
-        return f"{median:.1f} [{q25:.1f}-{q75:.1f}]"
+        # Filter to ±14 days
+        periop_vitals_df = periop_vitals_df[
+            (periop_vitals_df['days_from_transplant'] >= -PERIOP_DAYS) &
+            (periop_vitals_df['days_from_transplant'] <= PERIOP_DAYS)
+        ]
 
-    def format_mean_sd(series, count, threshold=SUPPRESSION_THRESHOLD):
-        """Format mean ± SD with suppression"""
-        if count < threshold or len(series) == 0:
-            return "--"
-        mean = series.mean()
-        std = series.std()
-        return f"{mean:.1f} ± {std:.1f}"
-    return (
-        format_count_pct,
-        format_mean_sd,
-        format_median_iqr,
-        is_suppressed,
-        suppress_count,
-    )
+        print(f"Perioperative vitals records: {len(periop_vitals_df):,}")
+    else:
+        periop_vitals_df = None
+        print("No vitals data available")
+    return PERIOP_DAYS, periop_vitals_df
+
+
+@app.cell
+def _(PERIOP_DAYS, heart_hosp_ids, heart_labs_df, heart_transplant_hosp, pd):
+    # Filter labs to perioperative window
+    if heart_labs_df is not None and len(heart_hosp_ids) > 0:
+        periop_labs_df = heart_labs_df[
+            heart_labs_df['hospitalization_id'].isin(heart_hosp_ids)
+        ].copy()
+
+        periop_labs_df['lab_result_dttm'] = pd.to_datetime(
+            periop_labs_df['lab_result_dttm'], utc=True
+        )
+
+        periop_labs_df = pd.merge(
+            periop_labs_df,
+            heart_transplant_hosp[['hospitalization_id', 'transplant_date']],
+            on='hospitalization_id',
+            how='inner'
+        )
+
+        periop_labs_df['days_from_transplant'] = (
+            periop_labs_df['lab_result_dttm'] - periop_labs_df['transplant_date']
+        ).dt.total_seconds() / (24 * 3600)
+
+        periop_labs_df = periop_labs_df[
+            (periop_labs_df['days_from_transplant'] >= -PERIOP_DAYS) &
+            (periop_labs_df['days_from_transplant'] <= PERIOP_DAYS)
+        ]
+
+        print(f"Perioperative labs records: {len(periop_labs_df):,}")
+    else:
+        periop_labs_df = None
+        print("No labs data available")
+    return (periop_labs_df,)
+
+
+@app.cell
+def _(
+    PERIOP_DAYS,
+    heart_hosp_ids,
+    heart_med_continuous_df,
+    heart_transplant_hosp,
+    pd,
+):
+    # Filter medications to vasoactives in perioperative window
+    VASOACTIVE_MEDS = [
+        'norepinephrine', 'epinephrine', 'dopamine', 'dobutamine',
+        'milrinone', 'vasopressin', 'phenylephrine', 'angiotensin'
+    ]
+
+    if heart_med_continuous_df is not None and len(heart_hosp_ids) > 0:
+        # Filter to vasoactives
+        periop_meds_df = heart_med_continuous_df[
+            heart_med_continuous_df['med_category'].isin(VASOACTIVE_MEDS)
+        ].copy()
+
+        periop_meds_df['admin_dttm'] = pd.to_datetime(
+            periop_meds_df['admin_dttm'], utc=True
+        )
+
+        periop_meds_df = pd.merge(
+            periop_meds_df,
+            heart_transplant_hosp[['hospitalization_id', 'transplant_date']],
+            on='hospitalization_id',
+            how='inner'
+        )
+
+        periop_meds_df['days_from_transplant'] = (
+            periop_meds_df['admin_dttm'] - periop_meds_df['transplant_date']
+        ).dt.total_seconds() / (24 * 3600)
+
+        periop_meds_df = periop_meds_df[
+            (periop_meds_df['days_from_transplant'] >= -PERIOP_DAYS) &
+            (periop_meds_df['days_from_transplant'] <= PERIOP_DAYS)
+        ]
+
+        print(f"Perioperative vasoactive records: {len(periop_meds_df):,}")
+    else:
+        periop_meds_df = None
+        print("No medication data available")
+    return VASOACTIVE_MEDS, periop_meds_df
+
+
+@app.cell
+def _(
+    PERIOP_DAYS,
+    heart_hosp_ids,
+    heart_respiratory_df,
+    heart_transplant_hosp,
+    pd,
+):
+    # Filter respiratory data to perioperative window
+    if heart_respiratory_df is not None and len(heart_hosp_ids) > 0:
+        periop_resp_df = heart_respiratory_df.copy()
+
+        periop_resp_df['recorded_dttm'] = pd.to_datetime(
+            periop_resp_df['recorded_dttm'], utc=True
+        )
+
+        periop_resp_df = pd.merge(
+            periop_resp_df,
+            heart_transplant_hosp[['hospitalization_id', 'transplant_date']],
+            on='hospitalization_id',
+            how='inner'
+        )
+
+        periop_resp_df['days_from_transplant'] = (
+            periop_resp_df['recorded_dttm'] - periop_resp_df['transplant_date']
+        ).dt.total_seconds() / (24 * 3600)
+
+        periop_resp_df = periop_resp_df[
+            (periop_resp_df['days_from_transplant'] >= -PERIOP_DAYS) &
+            (periop_resp_df['days_from_transplant'] <= PERIOP_DAYS)
+        ]
+
+        print(f"Perioperative respiratory records: {len(periop_resp_df):,}")
+    else:
+        periop_resp_df = None
+        print("No respiratory data available")
+    return (periop_resp_df,)
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell(column=3)
+def _(mo):
+    mo.md("""# Report & Visualizations""")
+    return
 
 
 @app.cell
@@ -411,7 +617,55 @@ def _(datetime, heart_only_df, mo, site_name, suppress_count, total_heart_n):
 
 @app.cell
 def _(mo):
-    mo.md("## Patient Demographics")
+    mo.md("""## Patient Demographics""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""## Transplant Volume""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""## Perioperative Vitals (±14 days from transplant)""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""## Perioperative Labs (±14 days from transplant)""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""## Vasoactive Medication Use (±14 days from transplant)""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""## Respiratory Support (±14 days from transplant)""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""## Advanced Therapies""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""## Outcomes""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""## Export Federated Results""")
     return
 
 
@@ -500,12 +754,6 @@ def _(
 
 
 @app.cell
-def _(mo):
-    mo.md("## Transplant Volume")
-    return
-
-
-@app.cell
 def _(SUPPRESSION_THRESHOLD, alt, heart_only_df, mo, site_name):
     # Annual volume chart with suppression
     def create_annual_volume_chart():
@@ -549,54 +797,6 @@ def _(SUPPRESSION_THRESHOLD, alt, heart_only_df, mo, site_name):
     else:
         mo.md(f"*{annual_chart_error}*")
     return
-
-
-@app.cell
-def _(mo):
-    mo.md("## Perioperative Vitals (±14 days from transplant)")
-    return
-
-
-@app.cell
-def _(heart_hosp_ids, heart_transplant_hosp, heart_vitals_df, pd):
-    # Filter vitals to perioperative window (±14 days)
-    PERIOP_DAYS = 14
-
-    if heart_vitals_df is not None and len(heart_hosp_ids) > 0:
-        # Filter to heart transplant hospitalizations
-        periop_vitals_df = heart_vitals_df[
-            heart_vitals_df['hospitalization_id'].isin(heart_hosp_ids)
-        ].copy()
-
-        # Convert datetime
-        periop_vitals_df['recorded_dttm'] = pd.to_datetime(
-            periop_vitals_df['recorded_dttm'], utc=True
-        )
-
-        # Merge with transplant dates
-        periop_vitals_df = pd.merge(
-            periop_vitals_df,
-            heart_transplant_hosp[['hospitalization_id', 'transplant_date']],
-            on='hospitalization_id',
-            how='inner'
-        )
-
-        # Calculate days from transplant
-        periop_vitals_df['days_from_transplant'] = (
-            periop_vitals_df['recorded_dttm'] - periop_vitals_df['transplant_date']
-        ).dt.total_seconds() / (24 * 3600)
-
-        # Filter to ±14 days
-        periop_vitals_df = periop_vitals_df[
-            (periop_vitals_df['days_from_transplant'] >= -PERIOP_DAYS) &
-            (periop_vitals_df['days_from_transplant'] <= PERIOP_DAYS)
-        ]
-
-        print(f"Perioperative vitals records: {len(periop_vitals_df):,}")
-    else:
-        periop_vitals_df = None
-        print("No vitals data available")
-    return PERIOP_DAYS, periop_vitals_df
 
 
 @app.cell
@@ -712,47 +912,6 @@ def _(SUPPRESSION_THRESHOLD, mo, periop_vitals_df, plt):
 
 
 @app.cell
-def _(mo):
-    mo.md("## Perioperative Labs (±14 days from transplant)")
-    return
-
-
-@app.cell
-def _(PERIOP_DAYS, heart_hosp_ids, heart_labs_df, heart_transplant_hosp, pd):
-    # Filter labs to perioperative window
-    if heart_labs_df is not None and len(heart_hosp_ids) > 0:
-        periop_labs_df = heart_labs_df[
-            heart_labs_df['hospitalization_id'].isin(heart_hosp_ids)
-        ].copy()
-
-        periop_labs_df['lab_result_dttm'] = pd.to_datetime(
-            periop_labs_df['lab_result_dttm'], utc=True
-        )
-
-        periop_labs_df = pd.merge(
-            periop_labs_df,
-            heart_transplant_hosp[['hospitalization_id', 'transplant_date']],
-            on='hospitalization_id',
-            how='inner'
-        )
-
-        periop_labs_df['days_from_transplant'] = (
-            periop_labs_df['lab_result_dttm'] - periop_labs_df['transplant_date']
-        ).dt.total_seconds() / (24 * 3600)
-
-        periop_labs_df = periop_labs_df[
-            (periop_labs_df['days_from_transplant'] >= -PERIOP_DAYS) &
-            (periop_labs_df['days_from_transplant'] <= PERIOP_DAYS)
-        ]
-
-        print(f"Perioperative labs records: {len(periop_labs_df):,}")
-    else:
-        periop_labs_df = None
-        print("No labs data available")
-    return (periop_labs_df,)
-
-
-@app.cell
 def _(SUPPRESSION_THRESHOLD, mo, periop_labs_df, plt):
     # Labs trajectory plot
     def create_labs_trajectory():
@@ -859,59 +1018,6 @@ def _(SUPPRESSION_THRESHOLD, mo, periop_labs_df, plt):
 
 
 @app.cell
-def _(mo):
-    mo.md("## Vasoactive Medication Use (±14 days from transplant)")
-    return
-
-
-@app.cell
-def _(
-    PERIOP_DAYS,
-    heart_hosp_ids,
-    heart_med_continuous_df,
-    heart_transplant_hosp,
-    pd,
-):
-    # Filter medications to vasoactives in perioperative window
-    VASOACTIVE_MEDS = [
-        'norepinephrine', 'epinephrine', 'dopamine', 'dobutamine',
-        'milrinone', 'vasopressin', 'phenylephrine', 'angiotensin'
-    ]
-
-    if heart_med_continuous_df is not None and len(heart_hosp_ids) > 0:
-        # Filter to vasoactives
-        periop_meds_df = heart_med_continuous_df[
-            heart_med_continuous_df['med_category'].isin(VASOACTIVE_MEDS)
-        ].copy()
-
-        periop_meds_df['admin_dttm'] = pd.to_datetime(
-            periop_meds_df['admin_dttm'], utc=True
-        )
-
-        periop_meds_df = pd.merge(
-            periop_meds_df,
-            heart_transplant_hosp[['hospitalization_id', 'transplant_date']],
-            on='hospitalization_id',
-            how='inner'
-        )
-
-        periop_meds_df['days_from_transplant'] = (
-            periop_meds_df['admin_dttm'] - periop_meds_df['transplant_date']
-        ).dt.total_seconds() / (24 * 3600)
-
-        periop_meds_df = periop_meds_df[
-            (periop_meds_df['days_from_transplant'] >= -PERIOP_DAYS) &
-            (periop_meds_df['days_from_transplant'] <= PERIOP_DAYS)
-        ]
-
-        print(f"Perioperative vasoactive records: {len(periop_meds_df):,}")
-    else:
-        periop_meds_df = None
-        print("No medication data available")
-    return VASOACTIVE_MEDS, periop_meds_df
-
-
-@app.cell
 def _(VASOACTIVE_MEDS, format_count_pct, heart_hosp_ids, mo, periop_meds_df):
     # Vasoactive use rates table
     def create_vasoactive_table():
@@ -935,51 +1041,6 @@ def _(VASOACTIVE_MEDS, format_count_pct, heart_hosp_ids, mo, periop_meds_df):
     vasoactive_table_md = mo.md(create_vasoactive_table())
     vasoactive_table_md
     return
-
-
-@app.cell
-def _(mo):
-    mo.md("## Respiratory Support (±14 days from transplant)")
-    return
-
-
-@app.cell
-def _(
-    PERIOP_DAYS,
-    heart_hosp_ids,
-    heart_respiratory_df,
-    heart_transplant_hosp,
-    pd,
-):
-    # Filter respiratory data to perioperative window
-    if heart_respiratory_df is not None and len(heart_hosp_ids) > 0:
-        periop_resp_df = heart_respiratory_df.copy()
-
-        periop_resp_df['recorded_dttm'] = pd.to_datetime(
-            periop_resp_df['recorded_dttm'], utc=True
-        )
-
-        periop_resp_df = pd.merge(
-            periop_resp_df,
-            heart_transplant_hosp[['hospitalization_id', 'transplant_date']],
-            on='hospitalization_id',
-            how='inner'
-        )
-
-        periop_resp_df['days_from_transplant'] = (
-            periop_resp_df['recorded_dttm'] - periop_resp_df['transplant_date']
-        ).dt.total_seconds() / (24 * 3600)
-
-        periop_resp_df = periop_resp_df[
-            (periop_resp_df['days_from_transplant'] >= -PERIOP_DAYS) &
-            (periop_resp_df['days_from_transplant'] <= PERIOP_DAYS)
-        ]
-
-        print(f"Perioperative respiratory records: {len(periop_resp_df):,}")
-    else:
-        periop_resp_df = None
-        print("No respiratory data available")
-    return (periop_resp_df,)
 
 
 @app.cell
@@ -1012,12 +1073,6 @@ def _(format_count_pct, heart_hosp_ids, mo, periop_resp_df):
 
     respiratory_table_md = mo.md(create_respiratory_table())
     respiratory_table_md
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("## Advanced Therapies")
     return
 
 
@@ -1103,12 +1158,6 @@ def _(
 
 
 @app.cell
-def _(mo):
-    mo.md("## Outcomes")
-    return
-
-
-@app.cell
 def _(
     format_count_pct,
     format_median_iqr,
@@ -1153,12 +1202,6 @@ def _(
 
     outcomes_md = mo.md(create_outcomes_table())
     outcomes_md
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("## Export Federated Results")
     return
 
 
@@ -1241,47 +1284,81 @@ def _(
     return
 
 
-@app.cell(column=1)
-def _(Hospitalization, Path, Patient, config):
-    # Setup paths and load core tables using clifpy
-    tables_path = Path(config['tables_path'])
-    output_dir = tables_path.parent / 'output' / 'final'
-    site_name = config['site_name']
-    file_type = config.get('file_type', 'parquet')
+@app.cell
+def _(HEART_TRANSPLANT_CPTS, Path, PatientProcedures, config):
+    # Debug: Load and display heart transplant procedures
+    _tables_path = Path(config['tables_path'])
+    _file_type = config.get('file_type', 'parquet')
 
-    # Load Patient table using clifpy
-    try:
-        patient_table = Patient.from_file(
-            data_directory=str(tables_path),
-            filetype=file_type,
-            timezone='UTC'
-        )
-        heart_patient_df = patient_table.df
-        print(f"Loaded patient via clifpy: {len(heart_patient_df):,} records")
-    except Exception as e:
-        print(f"Error loading patient table: {e}")
-        heart_patient_df = None
-
-    # Load Hospitalization table using clifpy
-    try:
-        hosp_table = Hospitalization.from_file(
-            data_directory=str(tables_path),
-            filetype=file_type,
-            timezone='UTC'
-        )
-        heart_hospitalization_df = hosp_table.df
-        print(f"Loaded hospitalization via clifpy: {len(heart_hospitalization_df):,} records")
-    except Exception as e:
-        print(f"Error loading hospitalization table: {e}")
-        heart_hospitalization_df = None
-    return (
-        file_type,
-        heart_hospitalization_df,
-        heart_patient_df,
-        output_dir,
-        site_name,
-        tables_path,
+    _proc_table = PatientProcedures.from_file(
+        data_directory=str(_tables_path),
+        filetype=_file_type,
+        timezone='UTC'
     )
+
+    heart_procedures_df = _proc_table.df[
+        _proc_table.df['procedure_code'].astype(str).isin(HEART_TRANSPLANT_CPTS)
+    ].copy()
+
+    # Deduplicate by code, hospitalization_id, and procedure_billed_dttm
+    _before = len(heart_procedures_df)
+    heart_procedures_df = heart_procedures_df.drop_duplicates(
+        subset=['procedure_code', 'hospitalization_id', 'procedure_billed_dttm']
+    )
+    print(f"Heart transplant procedures found: {len(heart_procedures_df):,} (removed {_before - len(heart_procedures_df):,} duplicates)")
+    heart_procedures_df
+    return (heart_procedures_df,)
+
+
+@app.cell
+def _(Hospitalization, Path, config, heart_procedures_df):
+    # Filter hospitalization table to heart transplant hospitalization_ids
+    _tables_path = Path(config['tables_path'])
+    _file_type = config.get('file_type', 'parquet')
+
+    _hosp_table = Hospitalization.from_file(
+        data_directory=str(_tables_path),
+        filetype=_file_type,
+        timezone='UTC'
+    )
+
+    _heart_hosp_ids = heart_procedures_df['hospitalization_id'].unique()
+    debug_heart_hosp_df = _hosp_table.df[
+        _hosp_table.df['hospitalization_id'].isin(_heart_hosp_ids)
+    ].copy()
+
+    print(f"Heart transplant hospitalizations in CLIF: {len(debug_heart_hosp_df):,} of {len(_heart_hosp_ids):,} procedure hospitalization_ids")
+    debug_heart_hosp_df
+    return
+
+
+@app.cell
+def _(Path, config, pd):
+    # Load national registry data filtered by site_name
+    _registry_path = Path(__file__).resolve().parent.parent / 'public' / 'data' / 'clif_hr_tx_counts.csv'
+    _registry_df = pd.read_csv(_registry_path)
+
+    _site_name = config['site_name']
+    registry_ucmc_df = _registry_df[
+        (_registry_df['clif_site'] == _site_name) &
+        (_registry_df['ORG_TY'] == 'HR')
+    ].copy()
+
+    print(f"National Registry Heart Transplants for {_site_name}:")
+    registry_ucmc_df
+    return
+
+
+@app.cell
+def _(heart_procedures_df, pd):
+    # Group heart procedures by year for comparison with registry
+    _df = heart_procedures_df.copy()
+    _df['year'] = pd.to_datetime(_df['procedure_billed_dttm']).dt.year
+
+    clif_by_year = _df.groupby('year').size().reset_index(name='clif_count')
+    print("CLIF Heart Transplant Procedures by Year:")
+    clif_by_year
+    return
 
 
 @app.cell
@@ -1289,55 +1366,13 @@ def _():
     return
 
 
-@app.cell(column=2)
-def _(
-    HEART_TRANSPLANT_CPTS,
-    PatientProcedures,
-    file_type,
-    heart_hospitalization_df,
-    pd,
-    tables_path,
-):
-    # Load Procedure table and identify heart transplants via CPT codes
-    try:
-        proc_table = PatientProcedures.from_file(
-            data_directory=str(tables_path),
-            filetype=file_type,
-            timezone='UTC'
-        )
-        procedures_df = proc_table.df
-        print(f"Loaded procedures via clifpy: {len(procedures_df):,} records")
-
-        # Filter to heart transplant CPT codes
-        heart_procedures = procedures_df[
-            procedures_df['procedure_code'].astype(str).isin(HEART_TRANSPLANT_CPTS)
-        ].copy()
-
-        if len(heart_procedures) > 0:
-            # Create transplant records with patient_id, hospitalization_id, and transplant_date
-            heart_transplant_df = heart_procedures[['hospitalization_id', 'procedure_billed_dttm']].copy()
-            heart_transplant_df = heart_transplant_df.rename(columns={'procedure_billed_dttm': 'transplant_date'})
-
-            # Merge with hospitalization to get patient_id
-            if heart_hospitalization_df is not None:
-                heart_transplant_df = pd.merge(
-                    heart_transplant_df,
-                    heart_hospitalization_df[['hospitalization_id', 'patient_id']],
-                    on='hospitalization_id',
-                    how='inner'
-                )
-            heart_transplant_df['transplant_type'] = 'heart'
-            print(f"Found heart transplants via CPT codes: {len(heart_transplant_df):,} procedures")
-        else:
-            heart_transplant_df = None
-            print("No heart transplant CPT codes found in procedures")
-    except Exception as e:
-        print(f"Error loading procedures: {e}")
-        heart_transplant_df = None
-    return (heart_transplant_df,)
+@app.cell(column=4)
+def _(mo):
+    mo.md("""# Debug & Registry Comparison""")
+    return
 
 
-@app.cell(column=3)
+@app.cell
 def _():
     return
 
