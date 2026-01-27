@@ -249,6 +249,10 @@ def _(Path, config, pd, tx_patients_by_year):
 
     ].copy()
     compare= tx_patients_by_year.merge(registry_ucmc_df[['year', 'transplants']], right_on = 'year', left_on = 'tx_year', how = 'inner')
+    compare = compare.rename(
+        columns={'transplants': 'srtr_hx_transplants',
+                'n_patients': 'clif_hx_transplants'}
+    )
     registry_comparison = compare.drop(columns = 'year')
     registry_comparison
     return (registry_comparison,)

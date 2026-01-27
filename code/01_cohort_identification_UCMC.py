@@ -12,9 +12,9 @@ def _(mo):
     return
 
 
-app._unparsable_cell(
-    r"""
-    yimport marimo as mo
+@app.cell
+def _():
+    import marimo as mo
     import pandas as pd
     import numpy as np
     import sys
@@ -39,9 +39,15 @@ app._unparsable_cell(
 
     # Heart transplant CPT codes
     HEART_TRANSPLANT_CPTS = ['33945', '33935']
-    """,
-    name="_"
-)
+    return (
+        HEART_TRANSPLANT_CPTS,
+        Hospitalization,
+        Path,
+        PatientProcedures,
+        load_config,
+        mo,
+        pd,
+    )
 
 
 @app.cell
