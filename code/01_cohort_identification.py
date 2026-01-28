@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.4"
+__generated_with = "0.19.6"
 app = marimo.App(width="columns")
 
 
@@ -177,7 +177,7 @@ def _(HEART_TRANSPLANT_CPTS, log_memory, logger, proc_table):
     heart_procedures_df = heart_procedures_df.rename(
         columns={'procedure_billed_dttm': 'apprx_transplant_date'}
     )
-    logger.info(f"[B] Unique heart transplant hospitalization procedures found: {heart_procedures_df['hospitalization_id'].nunique():,} (removed {_before_b - _heart_procedures_df['hospitalization_id'].nunique():,} duplicates)")
+    logger.info(f"Unique heart transplant hospitalization procedures found: {heart_procedures_df['hospitalization_id'].nunique():,} (removed {_before_b - _heart_procedures_df['hospitalization_id'].nunique():,} duplicates)")
     log_memory("After filtering procedures")
     return (heart_procedures_df,)
 
@@ -193,11 +193,11 @@ def _(heart_procedures_df, hosp_table, log_memory, logger):
     missing_hosp_ids = _heart_hosp_ids - _heart_hosp_ids_merged
 
     logger.info(
-        f"[B] Heart transplant hospitalization_ids from procedures NOT in hospitalization table: "
+        f"Heart transplant hospitalization_ids from procedures NOT in hospitalization table: "
         f"{len(missing_hosp_ids):,}"
     )
     logger.info(
-        f"[B] Unique Heart transplant patient_ids: "
+        f"Unique Heart transplant patient_ids: "
         f"{final_df['patient_id'].nunique():,}"
     )
     log_memory("After merge procedures with hospitalizations")
@@ -230,7 +230,7 @@ def _(final_df, pd):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Registry Comparison (B)
+    ### Registry Comparison 
     """)
     return
 
@@ -273,7 +273,7 @@ def _(final_df, logger, project_root, registry_comparison, site_name):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cohort_file = interm_dir / f'{site_name}_cohort.csv'
-    final_df[['patient_id', 'hospitalization_id']].to_csv(cohort_file, index=False)
+    final_df[['patient_id', 'hospitalization_id', 'apprx_transplant_date']].to_csv(cohort_file, index=False)
     logger.info(f"Saved cohort ids to {cohort_file}")
 
     registry_file = output_dir / f'{site_name}_aggregate_registry_comp.csv'
