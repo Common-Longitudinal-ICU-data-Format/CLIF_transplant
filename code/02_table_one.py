@@ -45,9 +45,12 @@ def _():
         HEART_TRANSPLANT_HOSPITALIZATIONS[['patient_id', 'hospitalization_id']]
         .astype(str)
     )
-    HEART_TRANSPLANT_HOSPITALIZATIONS['apprx_transplant_date'] = pd.to_datetime(
-        HEART_TRANSPLANT_HOSPITALIZATIONS['apprx_transplant_date']
-    )
+    _tx_date = pd.to_datetime(HEART_TRANSPLANT_HOSPITALIZATIONS['apprx_transplant_date'])
+    if _tx_date.dt.tz is None:
+        _tx_date = _tx_date.dt.tz_localize(config['time_zone'])
+    else:
+        _tx_date = _tx_date.dt.tz_convert(config['time_zone'])
+    HEART_TRANSPLANT_HOSPITALIZATIONS['apprx_transplant_date'] = _tx_date
 
 
     # Import clifpy table classes
@@ -56,6 +59,7 @@ def _():
         Labs, MedicationAdminContinuous, MedicationAdminIntermittent,
         Patient, Adt
     )
+    HEART_TRANSPLANT_HOSPITALIZATIONS.head()
     return (
         Adt,
         HEART_TRANSPLANT_HOSPITALIZATIONS,
@@ -288,8 +292,10 @@ def _(
     # Age at transplant
     cohort_with_dates = HEART_TRANSPLANT_HOSPITALIZATIONS[['patient_id', 'apprx_transplant_date']].drop_duplicates('patient_id')
     cohort_with_dates = cohort_with_dates.merge(pt_df[['patient_id', 'birth_date']], on='patient_id', how='left')
-    # Strip timezone from both for age calculation
-    tx_date = cohort_with_dates['apprx_transplant_date'].dt.tz_convert(None)
+    # Strip timezone from both for age calculation (timezone doesn't matter for age)
+    tx_date = pd.to_datetime(cohort_with_dates['apprx_transplant_date'])
+    if tx_date.dt.tz is not None:
+        tx_date = tx_date.dt.tz_convert(None)
     birth_date = pd.to_datetime(cohort_with_dates['birth_date'])
     if birth_date.dt.tz is not None:
         birth_date = birth_date.dt.tz_convert(None)
