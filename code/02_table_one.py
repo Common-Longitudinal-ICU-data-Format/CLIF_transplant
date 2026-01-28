@@ -288,10 +288,12 @@ def _(
     # Age at transplant
     cohort_with_dates = HEART_TRANSPLANT_HOSPITALIZATIONS[['patient_id', 'apprx_transplant_date']].drop_duplicates('patient_id')
     cohort_with_dates = cohort_with_dates.merge(pt_df[['patient_id', 'birth_date']], on='patient_id', how='left')
-    # Handle timezone awareness for birth_date
-    if cohort_with_dates['birth_date'].dt.tz is None:
-        cohort_with_dates['birth_date'] = pd.to_datetime(cohort_with_dates['birth_date']).dt.tz_localize('UTC')
-    age_at_tx = (cohort_with_dates['apprx_transplant_date'] - cohort_with_dates['birth_date']).dt.days / 365.25
+    # Strip timezone from both for age calculation
+    tx_date = cohort_with_dates['apprx_transplant_date'].dt.tz_convert(None)
+    birth_date = pd.to_datetime(cohort_with_dates['birth_date'])
+    if birth_date.dt.tz is not None:
+        birth_date = birth_date.dt.tz_convert(None)
+    age_at_tx = (tx_date - birth_date).dt.days / 365.25
     rows.append({"Characteristic": "Age at transplant (years), median [IQR]", "Value": median_iqr(age_at_tx)})
 
     # Discharge disposition
