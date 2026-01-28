@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "altair>=6.0.0",
+    "beautifulsoup4>=4.14.3",
     "clifpy>=0.3.8",
+    "lxml>=6.0.2",
     "marimo>=0.19.4",
     "matplotlib>=3.10.8",
     "numpy>=2.4.1",
@@ -15,6 +17,7 @@ dependencies = [
     "pyarrow>=23.0.0",
     "ruff>=0.14.13",
     "seaborn>=0.13.2",
+    "vl-convert-python>=1.9.0.post1",
 ]
 
 [dependency-groups]
