@@ -225,7 +225,6 @@ def _(
     except Exception as e:
         logger.error(f"Error loading adt table: {e}")
     return (
-        adt_table,
         config,
         hosp_table,
         labs_table,
@@ -350,7 +349,7 @@ def _(clif_tx_hospids, log_memory, logger, meds_interm_table):
 
     # Filter to the 1000mg dose specifically (must be in mg units)
     methylpred_1g = methylpred_steroids[
-        (methylpred_steroids["med_dose"] == 1000) &
+        (methylpred_steroids["med_dose"] > 100) &
         (methylpred_steroids["med_dose_unit"] == "mg")
     ].copy()
     logger.info(f"Methylprednisolone 1g doses found: {len(methylpred_1g)} records, {methylpred_1g['hospitalization_id'].nunique()} unique hospitalizations")
@@ -372,33 +371,52 @@ def _(clif_tx_hospids, log_memory, logger, meds_interm_table):
 
 
 @app.cell
-def _(adt_table, clif_tx_patientids_xclamp, logger):
-    # Keep only ICU admissions AFTER the transplant cross-clamp for meds
+def _(clif_tx_patientids_xclamp, logger, meds_interm_table, pd):
+    # Calculate post_transplant_ICU_in_dttm based on methylprednisolone doses
 
-    icu_adt_df = adt_table.df[adt_table.df["location_category"] == "icu"].copy()
-    logger.info(f"ICU ADT records: {len(icu_adt_df)}")
+    # Get all methylprednisolone doses in mg
+    methylpred_all = meds_interm_table.df[
+        (meds_interm_table.df["med_category"] == "methylprednisolone") &
+        (meds_interm_table.df["med_dose_unit"] == "mg")
+    ].copy()
 
-    # Merge with transplant cross-clamp times
-    icu_adt_merged = clif_tx_patientids_xclamp.merge(icu_adt_df, on="hospitalization_id", how = 'inner')
-    logger.info(f"ICU ADT records after merge with transplant times: {len(icu_adt_merged)}")
-
-    icu_adt_post_tx = icu_adt_merged[icu_adt_merged["in_dttm"] > icu_adt_merged["transplant_cross_clamp"]]
-    logger.info(f"ICU ADT records after transplant: {len(icu_adt_post_tx)}")
-
-    # Get the FIRST ICU admission after transplant
-    post_transplant_icu = (
-        icu_adt_post_tx
-        .sort_values("in_dttm")
+    # Option 1: First dose > 500mg, then add 12 hours
+    methylpred_gt500 = methylpred_all[methylpred_all["med_dose"] > 500]
+    first_gt500 = (
+        methylpred_gt500
+        .sort_values("admin_dttm")
         .groupby("hospitalization_id")
         .first()
-        .reset_index()[["hospitalization_id", "in_dttm", "transplant_cross_clamp"]]
-        .rename(columns={"in_dttm": "post_transplant_ICU_in_dttm"})
+        .reset_index()[["hospitalization_id", "admin_dttm"]]
     )
-    transplant_cohort = clif_tx_patientids_xclamp.merge(                              
-          post_transplant_icu[['hospitalization_id', 'post_transplant_ICU_in_dttm']],   
-          on='hospitalization_id',                                                      
-          how='inner'                                                                   
-      )  
+    first_gt500["post_transplant_ICU_in_dttm"] = first_gt500["admin_dttm"] + pd.Timedelta(hours=12)
+    first_gt500 = first_gt500[["hospitalization_id", "post_transplant_ICU_in_dttm"]]
+
+    # Option 2 (fallback): First dose > 100mg, use admin_dttm directly
+    methylpred_gt100 = methylpred_all[methylpred_all["med_dose"] > 100]
+    first_gt100 = (
+        methylpred_gt100
+        .sort_values("admin_dttm")
+        .groupby("hospitalization_id")
+        .first()
+        .reset_index()[["hospitalization_id", "admin_dttm"]]
+        .rename(columns={"admin_dttm": "post_transplant_ICU_in_dttm"})
+    )
+
+    # Merge: prefer >500mg rule, fallback to >100mg rule
+    transplant_cohort = clif_tx_patientids_xclamp.copy()
+    transplant_cohort = transplant_cohort.merge(first_gt500, on="hospitalization_id", how="left")
+    transplant_cohort = transplant_cohort.merge(
+        first_gt100, on="hospitalization_id", how="left", suffixes=("", "_fallback")
+    )
+    transplant_cohort["post_transplant_ICU_in_dttm"] = transplant_cohort[
+        "post_transplant_ICU_in_dttm"
+    ].fillna(transplant_cohort["post_transplant_ICU_in_dttm_fallback"])
+    transplant_cohort = transplant_cohort.drop(columns=["post_transplant_ICU_in_dttm_fallback"])
+
+    logger.info(f"Transplant cohort: {transplant_cohort['hospitalization_id'].nunique()} hospitalizations")
+    logger.info(f"  - Using >500mg + 12hr rule: {first_gt500['hospitalization_id'].nunique()}")
+    logger.info(f"  - Using >100mg fallback: {(transplant_cohort['post_transplant_ICU_in_dttm'].notna() & ~transplant_cohort['hospitalization_id'].isin(first_gt500['hospitalization_id'])).sum()}")
     return (transplant_cohort,)
 
 
