@@ -408,26 +408,13 @@ def _(adt_table, clif_tx_patientids_xclamp, log_memory, logger):
     logger.info(f"OR time calculated for {len(post_transplant_icu)} hospitalizations")
     logger.info(f"OR time median: {post_transplant_icu['hours_in_OR'].median():.1f} hours, IQR: [{post_transplant_icu['hours_in_OR'].quantile(0.25):.1f}-{post_transplant_icu['hours_in_OR'].quantile(0.75):.1f}]")
 
-    # Validation: OR time should be 2-8 hours for typical heart transplant
-    or_time_invalid = post_transplant_icu[
-        (post_transplant_icu['hours_in_OR'] < 2) |
-        (post_transplant_icu['hours_in_OR'] > 8)
-    ]
-
-    or_time_valid = post_transplant_icu[
-        (post_transplant_icu['hours_in_OR'] >= 2) &
-        (post_transplant_icu['hours_in_OR'] <= 15)
-    ]
-    logger.info(f"Hospitalizations with typical OR time (2-8 hours): {len(or_time_valid)} ({100*len(or_time_valid)/len(post_transplant_icu):.1f}%)")
-
     log_memory("After calculating OR time")
-    or_time_valid
-    return (or_time_valid,)
+    return (post_transplant_icu,)
 
 
 @app.cell
-def _(hosp_table, or_time_valid):
-    w_patientid = or_time_valid.merge(hosp_table.df, on='hospitalization_id', how = 'inner')
+def _(hosp_table, post_transplant_icu):
+    w_patientid = post_transplant_icu.merge(hosp_table.df, on='hospitalization_id', how = 'inner')
     w_patientid = w_patientid.drop_duplicates(['patient_id', 'hospitalization_id']).copy()
     w_patientid
     return (w_patientid,)
