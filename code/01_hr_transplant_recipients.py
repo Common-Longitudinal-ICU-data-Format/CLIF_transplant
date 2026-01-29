@@ -512,7 +512,7 @@ def _(
     patient_table,
     pd,
 ):
-    n_total = HEART_TRANSPLANT_HOSPITALIZATIONS['hospitalization_id'].nunique()
+    n_total = HEART_TRANSPLANT_HOSPITALIZATIONS['patient_id'].nunique()
 
     # Helper: format n (%)
     def n_pct(n, total):
