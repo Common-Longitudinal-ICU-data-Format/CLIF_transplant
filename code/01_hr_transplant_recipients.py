@@ -368,16 +368,13 @@ def _(clif_tx_hospids, log_memory, logger, meds_interm_table):
     log_memory("After filtering methylprednisolone")
     clif_tx_patientids_xclamp = clif_tx_hospids.merge(transplant_cross_clamp_times, on='hospitalization_id', how='left')
     clif_tx_patientids_xclamp
-    methylpred_1g
     return (clif_tx_patientids_xclamp,)
 
 
 @app.cell
-def _(adt_table, clif_tx_patientids_xclamp, log_memory, logger):
-    # Step 3a: Filter ADT to ICU Locations after transplant
-    log_memory("Before calculating OR time")
+def _(adt_table, clif_tx_patientids_xclamp, logger):
+    # Keep only ICU admissions AFTER the transplant cross-clamp for meds
 
-    # Get only ICU location entries
     icu_adt_df = adt_table.df[adt_table.df["location_category"] == "icu"].copy()
     logger.info(f"ICU ADT records: {len(icu_adt_df)}")
 
@@ -385,7 +382,6 @@ def _(adt_table, clif_tx_patientids_xclamp, log_memory, logger):
     icu_adt_merged = clif_tx_patientids_xclamp.merge(icu_adt_df, on="hospitalization_id", how = 'inner')
     logger.info(f"ICU ADT records after merge with transplant times: {len(icu_adt_merged)}")
 
-    # Keep only ICU admissions AFTER the transplant cross-clamp
     icu_adt_post_tx = icu_adt_merged[icu_adt_merged["in_dttm"] > icu_adt_merged["transplant_cross_clamp"]]
     logger.info(f"ICU ADT records after transplant: {len(icu_adt_post_tx)}")
 
@@ -398,23 +394,17 @@ def _(adt_table, clif_tx_patientids_xclamp, log_memory, logger):
         .reset_index()[["hospitalization_id", "in_dttm", "transplant_cross_clamp"]]
         .rename(columns={"in_dttm": "post_transplant_ICU_in_dttm"})
     )
-
-    # Step 3b: Calculate OR Time (hours between transplant and first ICU admission)
-    post_transplant_icu["hours_in_OR"] = (
-        (post_transplant_icu["post_transplant_ICU_in_dttm"] - post_transplant_icu["transplant_cross_clamp"])
-        .dt.total_seconds() / 3600
-    )
-
-    logger.info(f"OR time calculated for {len(post_transplant_icu)} hospitalizations")
-    logger.info(f"OR time median: {post_transplant_icu['hours_in_OR'].median():.1f} hours, IQR: [{post_transplant_icu['hours_in_OR'].quantile(0.25):.1f}-{post_transplant_icu['hours_in_OR'].quantile(0.75):.1f}]")
-
-    log_memory("After calculating OR time")
-    return (post_transplant_icu,)
+    transplant_cohort = clif_tx_patientids_xclamp.merge(                              
+          post_transplant_icu[['hospitalization_id', 'post_transplant_ICU_in_dttm']],   
+          on='hospitalization_id',                                                      
+          how='inner'                                                                   
+      )  
+    return (transplant_cohort,)
 
 
 @app.cell
-def _(hosp_table, post_transplant_icu):
-    w_patientid = post_transplant_icu.merge(hosp_table.df, on='hospitalization_id', how = 'inner')
+def _(hosp_table, transplant_cohort):
+    w_patientid = transplant_cohort.merge(hosp_table.df, on='hospitalization_id', how = 'inner')
     w_patientid = w_patientid.drop_duplicates(['patient_id', 'hospitalization_id']).copy()
     w_patientid
     return (w_patientid,)
