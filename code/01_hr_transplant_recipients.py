@@ -180,7 +180,7 @@ def _(
             filetype=file_type,
             timezone=time_zone,
             filters={'lab_category':['creatinine', 'bilirubin_total', 'albumin', 'sodium']},
-            columns=['hospitalization_id', 'lab_collect_dttm', 'lab_order_category', 'lab_category', 'lab_value_numeric']
+            columns=['hospitalization_id', 'lab_result_dttm', 'lab_order_category', 'lab_category', 'lab_value_numeric']
         )
         logger.info(f"Loaded labs: {hosp_table.df['hospitalization_id'].nunique():,} unique hospitalizations")
         log_memory("After loading labs table")
@@ -629,10 +629,10 @@ def _(
         on='hospitalization_id', how='inner'
     )
     # Filter to labs BEFORE transplant
-    pre_tx_labs = labs_merged[labs_merged['lab_collect_dttm'] < labs_merged['transplant_cross_clamp']]
+    pre_tx_labs = labs_merged[labs_merged['lab_result_dttm'] < labs_merged['transplant_cross_clamp']]
 
     # Get most recent lab per hospitalization per category
-    pre_tx_labs = pre_tx_labs.sort_values('lab_collect_dttm', ascending=False)
+    pre_tx_labs = pre_tx_labs.sort_values('lab_result_dttm', ascending=False)
     most_recent_labs = pre_tx_labs.drop_duplicates(['hospitalization_id', 'lab_category'], keep='first')
 
     # Calculate median [IQR] for each lab category
