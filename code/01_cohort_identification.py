@@ -267,13 +267,17 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(final_df, logger, project_root, registry_comparison, site_name):
+def _(config, final_df, logger, project_root, registry_comparison, site_name):
     output_dir = project_root / 'output' / 'final'
     interm_dir = project_root / 'output' / 'intermediate'
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Convert to site timezone before saving
+    cohort_df = final_df[['patient_id', 'hospitalization_id', 'apprx_transplant_date']].copy()
+    cohort_df['apprx_transplant_date'] = cohort_df['apprx_transplant_date'].dt.tz_convert(config['time_zone'])
+
     cohort_file = interm_dir / f'{site_name}_cohort.csv'
-    final_df[['patient_id', 'hospitalization_id', 'apprx_transplant_date']].to_csv(cohort_file, index=False)
+    cohort_df.to_csv(cohort_file, index=False)
     logger.info(f"Saved cohort ids to {cohort_file}")
 
     registry_file = output_dir / f'{site_name}_aggregate_registry_comp.csv'
