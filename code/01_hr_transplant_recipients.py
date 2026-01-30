@@ -921,7 +921,7 @@ def _(alt, methylprednisolone_merged, pd):
         how='left'
     )
 
-    # Fill missing with 0 (patient had prednisone before but not this day)
+    # Fill missing with 0 (patient had methylprednisolone before but not this day)
     daily_dose_filled['daily_dose'] = daily_dose_filled['daily_dose'].fillna(0)
 
     # Average across patients (now includes zeros for stopped patients)
@@ -977,7 +977,7 @@ def _(alt, methylprednisolone_merged, pd):
         how='left'
     )
 
-    # Fill missing with 0 (patient had prednisone before but not this day)
+    # Fill missing with 0 (patient had methylprednisolone before but not this day)
     daily_dose_filled['daily_dose'] = daily_dose_filled['daily_dose'].fillna(0)
 
     # Average across patients (now includes zeros for stopped patients)
@@ -991,13 +991,13 @@ def _(alt, methylprednisolone_merged, pd):
         )
     )
 
-    # Plot average daily prednisone dose
+    # Plot average daily methylprednisolone dose
     methylprednisolone_chart = alt.Chart(avg_daily_methylprednisolone).mark_line().encode(
         x=alt.X('days_from_tx:Q', title='Days Post-Transplant'),
         y=alt.Y('avg_dose:Q', title='Average Daily Dose (mg)'),
         tooltip=['days_from_tx', 'avg_dose', 'n_patients']
     ).properties(
-        title='Average Daily Prednisone Dose (21 Days Post-Transplant)',
+        title='Average Daily Methylprednisolone Dose (21 Days Post-Transplant)',
         width=500,
         height=300
     ).configure_axis(grid=False).configure_view(strokeWidth=0)
@@ -1058,7 +1058,7 @@ def _(
     methylprednisolone_chart.save(str(methylprednisolone_chart_file))
     logger.info(f"Saved methylprednisolone_chart daily chart to {methylprednisolone_chart_file}")
 
-    # Save prednisone daily summary CSV
+    # Save methylprednisolone daily summary CSV
     methylprednisolone_chart_csv_file = output_dir / f'{site_name}_methylprednisolone_chart_daily_summary.csv'
     avg_daily_methylprednisolone.to_csv(methylprednisolone_chart_csv_file, index=False)
     logger.info(f"Saved methylprednisolone_chart daily summary to {methylprednisolone_chart_csv_file}")
