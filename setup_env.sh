@@ -1,73 +1,58 @@
 #!/bin/bash
 
 # Setup script for CLIF to Valeos Inpatient project
-# This script creates and sets up the virtual environment
-# USAGE: source ./setup_env.sh (to activate in current shell)
-#    OR: ./setup_env.sh && source .valeos_inpatient/bin/activate
+# Detects uv and uses it if available, otherwise falls back to traditional venv
 
-echo "Setting up virtual environment for CLIF to Valeos Inpatient project..."
+echo "Setting up environment for CLIF to Valeos Inpatient project..."
 
-# Check if virtual environment already exists
-NEEDS_INSTALL=false
-if [ -d ".valeos_inpatient" ]; then
-    echo "Virtual environment already exists."
-    read -p "Do you want to recreate it? (y/n): " recreate
-    if [ "$recreate" = "y" ] || [ "$recreate" = "Y" ]; then
-        echo "Removing existing virtual environment..."
-        rm -rf .valeos_inpatient
-        NEEDS_INSTALL=true
+# Check if uv is installed
+if command -v uv &> /dev/null; then
+    echo "Found uv, using it for dependency management..."
+    uv sync
+
+    if [ $? -eq 0 ]; then
+        echo ""
+        echo "Setup completed successfully!"
+        echo ""
+        echo "To run commands, use 'uv run', for example:"
+        echo "  uv run marimo edit code/heart_transplant_report.py"
+        echo "  uv run python script.py"
     else
-        echo "Using existing virtual environment."
-        # Check if dependencies need to be installed
-        if [ ! -f ".valeos_inpatient/.setup_complete" ]; then
-            NEEDS_INSTALL=true
-        fi
+        echo "Error: Failed to install dependencies with uv"
+        exit 1
     fi
 else
-    NEEDS_INSTALL=true
-fi
+    echo "uv not found, using traditional venv..."
 
-# Create virtual environment if it doesn't exist
-if [ ! -d ".valeos_inpatient" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv .valeos_inpatient
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to create virtual environment"
-        return 1 2>/dev/null || exit 1
+    # Check if virtual environment already exists
+    if [ -d ".venv" ]; then
+        echo "Virtual environment already exists."
+    else
+        echo "Creating virtual environment..."
+        python3 -m venv .venv
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to create virtual environment"
+            return 1 2>/dev/null || exit 1
+        fi
     fi
-fi
 
-# Activate virtual environment
-echo "Activating virtual environment..."
-source .valeos_inpatient/bin/activate
+    # Activate virtual environment
+    echo "Activating virtual environment..."
+    source .venv/bin/activate
 
-# Install or upgrade dependencies if needed
-if [ "$NEEDS_INSTALL" = true ]; then
-    # Upgrade pip
-    echo "Upgrading pip..."
-    pip install --upgrade pip
-
-    # Install dependencies
+    # Upgrade pip and install dependencies
     echo "Installing dependencies..."
+    pip install --upgrade pip
     pip install -r requirements.txt
 
     if [ $? -eq 0 ]; then
-        # Mark setup as complete
-        touch .valeos_inpatient/.setup_complete
-        echo "✅ Setup completed successfully!"
+        echo ""
+        echo "Setup completed successfully!"
+        echo ""
+        echo "To activate the environment in future sessions, run:"
+        echo "  source .venv/bin/activate"
     else
-        echo "❌ Error: Failed to install dependencies"
+        echo "Error: Failed to install dependencies"
         return 1 2>/dev/null || exit 1
     fi
-else
-    echo "✅ Dependencies already installed, skipping..."
 fi
-
-echo ""
-echo "Virtual environment is now active!"
-echo ""
-echo "To activate the environment in future sessions, run:"
-echo "source .valeos_inpatient/bin/activate"
-echo ""
-echo "To verify the setup:"
-echo "python -c \"import pandas; import numpy; print('Setup verified!')\""

@@ -60,9 +60,18 @@ The project follows a three-step analysis workflow:
 
 ## Environment Setup
 
+### Option A: Using uv (recommended)
+
 ```bash
-python3 -m venv .valeos_inpatient
-source .valeos_inpatient/bin/activate
+uv sync
+uv run marimo edit code/heart_transplant_report.py
+```
+
+### Option B: Using traditional venv
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 

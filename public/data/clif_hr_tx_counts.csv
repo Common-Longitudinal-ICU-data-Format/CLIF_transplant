@@ -1,4 +1,18 @@
 year,clif_site,CAN_LISTING_CTR_CD,ENTIRE_NAME,peds,ORG_TY,transplants
+2018,Emory,GAEM,Emory University Hospital,0,HR,31
+2018,JHU,MDJH,Johns Hopkins Hospital,0,HR,15
+2018,JHU,MDJH,Johns Hopkins Hospital,1,HR,5
+2018,Michigan,MIUM,University of Michigan Medical Center,0,HR,27
+2018,Michigan,MIUM,University of Michigan Medical Center,1,HR,10
+2018,NU,ILNM,Northwestern Memorial Hospital,0,HR,56
+2018,OHSU,ORUO,Oregon Health and Science University,0,HR,10
+2018,Penn,PAUP,Hospital of the University of Pennsylvania,0,HR,36
+2018,UCMC,ILUC,University of Chicago Medical Center,0,HR,39
+2018,UCMC,ILUC,University of Chicago Medical Center,1,HR,2
+2018,UCSF,CAMB,UCSF Medical Center at Mission Bay,1,HR,1
+2018,UCSF,CASF,University of California San Francisco Medical Center,0,HR,14
+2018,UMN,MNUM,"University of Minnesota Medical Center, Fairview",0,HR,25
+2018,UMN,MNUM,"University of Minnesota Medical Center, Fairview",1,HR,8
 2019,Emory,GAEM,Emory University Hospital,0,HR,36
 2019,JHU,MDJH,Johns Hopkins Hospital,0,HR,27
 2019,JHU,MDJH,Johns Hopkins Hospital,1,HR,2
@@ -88,3 +102,4 @@ year,clif_site,CAN_LISTING_CTR_CD,ENTIRE_NAME,peds,ORG_TY,transplants
 2024,UCSF,CASF,University of California San Francisco Medical Center,0,HR,74
 2024,UMN,MNUM,"University of Minnesota Medical Center, Fairview",0,HR,28
 2024,UMN,MNUM,"University of Minnesota Medical Center, Fairview",1,HR,3
+

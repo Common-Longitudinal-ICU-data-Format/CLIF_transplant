@@ -1,14 +1,29 @@
  ## Code directory
 
-Open your terminal and navigate run the following, replacing the path with the location of the cloned project
+Open your terminal and navigate to the project directory, then run the following:
 
+### Using uv (recommended)
+
+```bash
+cd [path/to/your/local_project]
+
+# Install dependencies (if not already done)
+uv sync
+
+# Run the cohort identification script
+uv run marimo run code/01_cohort_identification.py
+
+# Or edit the script interactively
+uv run marimo edit code/01_cohort_identification.py
 ```
+
+### Using traditional venv
+
+```bash
 cd [path/to/your/local_project]
 
 ./setup_env.sh
 
-python code/clif_to_valeos.py
-
-marimo run code/valeos_inpatient_dashboard.py
+marimo run code/01_cohort_identification.py
 ```
 
