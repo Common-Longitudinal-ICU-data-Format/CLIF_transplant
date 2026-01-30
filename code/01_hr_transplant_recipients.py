@@ -78,9 +78,9 @@ def _(Path):
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
 
-    # File handler for main log
+    # File handler for main log (mode='w' to overwrite on each run)
     main_log_path = log_dir / 'cohort_identification.log'
-    file_handler = logging.FileHandler(main_log_path)
+    file_handler = logging.FileHandler(main_log_path, mode='w')
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     logger.addHandler(file_handler)
 
@@ -95,7 +95,7 @@ def _(Path):
     mem_logger.handlers.clear()
 
     mem_log_path = log_dir / 'memory_usage.log'
-    mem_handler = logging.FileHandler(mem_log_path)
+    mem_handler = logging.FileHandler(mem_log_path, mode='w')
     mem_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
     mem_logger.addHandler(mem_handler)
 
@@ -289,6 +289,15 @@ def _(
         )
         logger.info(f"Converted continuous medication units. Conversion summary:")
         logger.info(f"\n{_meds_cont_counts.to_string()}")
+        # Handle nitric_oxide specially: ppm is already the target unit, no conversion needed
+        _nitric_ppm_mask = (meds_table.df['med_category'] == 'nitric_oxide') & (meds_table.df['med_dose_unit'] == 'ppm')
+        meds_table.df.loc[_nitric_ppm_mask, '_convert_status'] = 'success'
+        meds_table.df.loc[_nitric_ppm_mask, 'med_dose_converted'] = meds_table.df.loc[_nitric_ppm_mask, 'med_dose']
+        logger.info(f"Marked {_nitric_ppm_mask.sum()} nitric_oxide ppm records as successful (no conversion needed)")
+
+        # Log conversion status breakdown by medication category
+        _status_counts = meds_table.df.groupby(['med_category', '_convert_status']).size().reset_index(name='count')
+        logger.info(f"Unit conversion status by medication category:\n{_status_counts.to_string()}")
         log_memory("After continuous meds unit conversion")
     except Exception as e:
         logger.error(f"Error converting continuous medication units: {e}")
@@ -339,7 +348,7 @@ def _(HEART_TRANSPLANT_CPTS, log_memory, logger, proc_table):
 
 
 @app.cell
-def _(clif_tx_hospids, log_memory, logger, meds_interm_table):
+def _(clif_tx_hospids, log_memory, logger, meds_interm_table, pd):
     # Step 2a: Filter to Methylprednisolone 1g dose as proxy for transplant cross-clamp time
     log_memory("Before filtering methylprednisolone")
 
@@ -348,25 +357,50 @@ def _(clif_tx_hospids, log_memory, logger, meds_interm_table):
         meds_interm_table.df["med_category"] == "methylprednisolone"
     ]
 
-    # Filter to the 1000mg dose specifically (must be in mg units)
-    methylpred_1g = methylpred_steroids[
+    # Step 2a: Filter methylprednisolone by dose thresholds
+    # Primary: >500mg, Fallback: >100mg
+    xclamp_methylpred_gt500 = methylpred_steroids[
+        (methylpred_steroids["med_dose"] > 500) &
+        (methylpred_steroids["med_dose_unit"] == "mg")
+    ].copy()
+
+    xclamp_methylpred_gt100 = methylpred_steroids[
         (methylpred_steroids["med_dose"] > 100) &
         (methylpred_steroids["med_dose_unit"] == "mg")
     ].copy()
-    logger.info(f"Methylprednisolone 1g doses found: {len(methylpred_1g)} records, {methylpred_1g['hospitalization_id'].nunique()} unique hospitalizations")
 
-    # Step 2b: Get First 1g Dose Per Hospitalization as transplant cross-clamp time
-    transplant_cross_clamp_times = (
-        methylpred_1g
+    # Get first >500mg dose per hospitalization
+    xclamp_first_gt500 = (
+        xclamp_methylpred_gt500
         .sort_values("admin_dttm")
         .groupby("hospitalization_id")
         .first()
         .reset_index()[["hospitalization_id", "admin_dttm"]]
         .rename(columns={"admin_dttm": "transplant_cross_clamp"})
     )
-    logger.info(f"Transplant cross-clamp times identified for {len(transplant_cross_clamp_times)} hospitalizations")
+
+    # Get first >100mg dose per hospitalization (fallback)
+    xclamp_first_gt100 = (
+        xclamp_methylpred_gt100
+        .sort_values("admin_dttm")
+        .groupby("hospitalization_id")
+        .first()
+        .reset_index()[["hospitalization_id", "admin_dttm"]]
+        .rename(columns={"admin_dttm": "transplant_cross_clamp"})
+    )
+
+    # Merge: prefer >500mg, fallback to >100mg
+    transplant_cross_clamp_times = xclamp_first_gt500.copy()
+    # Add hospitalizations that only have >100mg (not in >500mg)
+    xclamp_fallback_hosps = xclamp_first_gt100[~xclamp_first_gt100["hospitalization_id"].isin(xclamp_first_gt500["hospitalization_id"])]
+    transplant_cross_clamp_times = pd.concat([transplant_cross_clamp_times, xclamp_fallback_hosps], ignore_index=True)
+
+    # Log counts
+    n_xclamp_gt500 = xclamp_first_gt500["hospitalization_id"].nunique()
+    n_xclamp_fallback = xclamp_fallback_hosps["hospitalization_id"].nunique()
+    logger.info(f"Transplant cross-clamp times: {n_xclamp_gt500} using >500mg, {n_xclamp_fallback} fallback to >100mg, {n_xclamp_gt500 + n_xclamp_fallback} total")
     log_memory("After filtering methylprednisolone")
-    clif_tx_patientids_xclamp = clif_tx_hospids.merge(transplant_cross_clamp_times, on='hospitalization_id', how='left')
+    clif_tx_patientids_xclamp = clif_tx_hospids.merge(transplant_cross_clamp_times, on='hospitalization_id', how='inner')
     clif_tx_patientids_xclamp
     return (clif_tx_patientids_xclamp,)
 
@@ -564,9 +598,13 @@ def _(
     age_at_tx = (cohort_with_dates['transplant_cross_clamp'] - cohort_with_dates['birth_date']).dt.days / 365.25
     rows.append({"Characteristic": "Age at transplant (years), median [IQR]", "Value": median_iqr(age_at_tx)})
 
-    # Discharge disposition
-    cohort_hosp_ids = HEART_TRANSPLANT_HOSPITALIZATIONS['hospitalization_id'].unique()
-    hosp_df = hosp_table.df[hosp_table.df['hospitalization_id'].isin(cohort_hosp_ids)].copy()
+    # Discharge disposition - use latest hospitalization per patient
+    _latest_hosp_for_discharge = (
+        HEART_TRANSPLANT_HOSPITALIZATIONS
+        .sort_values('transplant_cross_clamp', ascending=False)
+        .drop_duplicates('patient_id', keep='first')
+    )
+    hosp_df = hosp_table.df[hosp_table.df['hospitalization_id'].isin(_latest_hosp_for_discharge['hospitalization_id'])].copy()
     rows.append({"Characteristic": "Discharge disposition", "Value": ""})
     for val, cnt in hosp_df['discharge_category'].value_counts().items():
         rows.append({"Characteristic": f"  {val}", "Value": n_pct(cnt, n_total)})
@@ -659,7 +697,7 @@ def _(final_df):
 
 
 @app.cell
-def _(HEART_TRANSPLANT_HOSPITALIZATIONS, meds_table, pd):
+def _(HEART_TRANSPLANT_HOSPITALIZATIONS, logger, meds_table, pd):
     # Step 1: Merge medications with transplant cohort
     _meds_merged = meds_table.df.merge(
         HEART_TRANSPLANT_HOSPITALIZATIONS[['patient_id', 'hospitalization_id', 'post_transplant_ICU_in_dttm']],
@@ -692,10 +730,13 @@ def _(HEART_TRANSPLANT_HOSPITALIZATIONS, meds_table, pd):
         for med in _med_categories
     ])
 
-    # Step 4: Aggregate actual doses (sum doses within same hour if multiple)
+    # Step 4: Filter to only successfully converted records, then aggregate
+    _meds_7d_success = _meds_7d[_meds_7d['_convert_status'] == 'success'].copy()
+    logger.info(f"Hourly summary: {len(_meds_7d)} total records, {len(_meds_7d_success)} with successful unit conversion")
+
     _meds_7d_agg = (
-        _meds_7d
-        .groupby(['hospitalization_id', 'med_category', 'tx_hour'], as_index=False)['med_dose']
+        _meds_7d_success
+        .groupby(['hospitalization_id', 'med_category', 'tx_hour'], as_index=False)['med_dose_converted']
         .sum()
     )
 
@@ -706,36 +747,36 @@ def _(HEART_TRANSPLANT_HOSPITALIZATIONS, meds_table, pd):
         how='left'
     )
 
-    # Step 5: Apply fill logic (Before First Dose = 0, After = LOCF)
-    def _fill_doses(group):
-        group = group.sort_values('tx_hour')
-        first_dose_idx = group['med_dose'].first_valid_index()
-        if first_dose_idx is None:
-            # Patient never received this medication - all zeros
-            group['med_dose'] = 0.0
-        else:
-            first_hour = group.loc[first_dose_idx, 'tx_hour']
-            # Before first dose: 0
-            group.loc[group['tx_hour'] < first_hour, 'med_dose'] = 0.0
-            # After first dose: LOCF (forward fill), then fill remaining with 0
-            group['med_dose'] = group['med_dose'].ffill().fillna(0.0)
-        return group
+    # Step 5: Apply fill logic (Backfill + LOCF - matches GitHub notebook approach)
+    # This ensures early hours before first observation get backfilled from first dose
+    _meds_filled = _meds_filled.sort_values(['hospitalization_id', 'med_category', 'tx_hour'])
 
-    _meds_filled = (
+    # Step 5a: Backfill (fills early NAs from first observation)
+    _meds_filled['med_dose_imputed'] = (
         _meds_filled
-        .groupby(['hospitalization_id', 'med_category'], group_keys=False)
-        .apply(_fill_doses)
-        .reset_index(drop=True)
+        .groupby(['hospitalization_id', 'med_category'])['med_dose_converted']
+        .bfill()
     )
+
+    # Step 5b: Forward fill (LOCF for any remaining gaps)
+    _meds_filled['med_dose_converted'] = (
+        _meds_filled
+        .groupby(['hospitalization_id', 'med_category'])['med_dose_imputed']
+        .ffill()
+    )
+
+    # Step 5c: Fill remaining NaN with 0 (patient never received this medication)
+    _meds_filled['med_dose_converted'] = _meds_filled['med_dose_converted'].fillna(0.0)
+    _meds_filled = _meds_filled.drop(columns=['med_dose_imputed'])
 
     # Step 6: Calculate Summary Statistics
     hourly_meds_summary = (
         _meds_filled
         .groupby(['med_category', 'tx_hour'], as_index=False)
         .agg(
-            med_dose=('med_dose', 'median'),
-            n_patients=('hospitalization_id', 'nunique'),
-            n_receiving=('med_dose', lambda x: (x > 0).sum())
+            med_dose_median=('med_dose_converted', 'median'),
+            med_dose_mean=('med_dose_converted', 'mean'),
+            n_receiving=('med_dose_converted', lambda x: (x > 0).sum())
         )
     )
     hourly_meds_summary
@@ -743,35 +784,73 @@ def _(HEART_TRANSPLANT_HOSPITALIZATIONS, meds_table, pd):
 
 
 @app.cell
-def _(alt, hourly_meds_summary):
+def _(alt, hourly_meds_summary, pd):
+    # Unit mapping for each medication category (matches preferred_units from conversion)
+    _med_units = {
+        "norepinephrine": "mcg/kg/min",
+        "epinephrine": "mcg/kg/min",
+        "dopamine": "mcg/kg/min",
+        "dobutamine": "mcg/kg/min",
+        "milrinone": "mcg/kg/min",
+        "isoproterenol": "mcg/min",
+        "nitric_oxide": "ppm"
+    }
+
     # Create separate dose and n_receiving charts for each med_category
     hourly_med_dose_charts = {}
     hourly_med_npatients_charts = {}
     for _med_cat in hourly_meds_summary['med_category'].unique():
-        _med_data = hourly_meds_summary[hourly_meds_summary['med_category'] == _med_cat]
+        _med_data = hourly_meds_summary[hourly_meds_summary['med_category'] == _med_cat].copy()
+        _unit = _med_units.get(_med_cat, "units")
 
-        # Chart for median dose
-        _dose_chart = alt.Chart(_med_data).mark_line(point=True).encode(
+        # Reshape data for proper legend (melt median and mean into single column)
+        _med_data_long = pd.melt(
+            _med_data,
+            id_vars=['med_category', 'tx_hour', 'n_receiving'],
+            value_vars=['med_dose_median', 'med_dose_mean'],
+            var_name='measure',
+            value_name='dose'
+        )
+        _med_data_long['measure'] = _med_data_long['measure'].map({
+            'med_dose_median': 'Median',
+            'med_dose_mean': 'Mean'
+        })
+
+        # Chart for median and mean dose with proper legend inside chart area
+        _dose_chart = alt.Chart(_med_data_long).mark_line().encode(
             x=alt.X('tx_hour:Q', title='Hours Post-Transplant'),
-            y=alt.Y('med_dose:Q', title='Median Dose'),
-            tooltip=['tx_hour', 'med_dose', 'n_receiving']
+            y=alt.Y('dose:Q', title=f'Dose ({_unit})'),
+            color=alt.Color('measure:N', scale=alt.Scale(
+                domain=['Median', 'Mean'],
+                range=['steelblue', 'coral']
+            ), legend=alt.Legend(
+                title=None,
+                orient='none',
+                legendX=400,
+                legendY=10,
+                direction='horizontal',
+                fillColor='white',
+                strokeColor='gray',
+                padding=5
+            )),
+            tooltip=['tx_hour', 'measure', 'dose', 'n_receiving']
         ).properties(
-            title=f'{_med_cat.capitalize()} - Median Hourly Dose (Post Transplant ICU `in_dttm`)',
+            title=f'{_med_cat.capitalize()} - Hourly Dose ({_unit})',
             width=500,
             height=300
-        )
+        ).configure_axis(grid=False).configure_view(strokeWidth=0)
         hourly_med_dose_charts[_med_cat] = _dose_chart
 
         # Chart for n_receiving
-        _npatients_chart = alt.Chart(_med_data).mark_line(point=True, color='coral').encode(
+        _npatients_chart = alt.Chart(_med_data).mark_line(color='coral').encode(
             x=alt.X('tx_hour:Q', title='Hours Post-Transplant'),
-            y=alt.Y('n_receiving:Q', title='N Patients'),
-            tooltip=['tx_hour', 'med_dose', 'n_receiving']
+            y=alt.Y('n_receiving:Q', title=f'N Patients Receiving ({_unit})'),
+            tooltip=['tx_hour', 'med_dose_median', 'med_dose_mean', 'n_receiving']
         ).properties(
-            title=f'{_med_cat.capitalize()} - N Patients by Hour (Post Transplant ICU `in_dttm)`',
+            title=f'{_med_cat.capitalize()} - N Patients Receiving ({_unit})',
             width=500,
             height=300
-        )
+        ).configure_axis(grid=False).configure_view(strokeWidth=0)
         hourly_med_npatients_charts[_med_cat] = _npatients_chart
     return hourly_med_dose_charts, hourly_med_npatients_charts
 
@@ -835,16 +914,16 @@ def _(alt, methylprednisolone_merged, pd):
         )
     )
 
-    # Plot average daily prednisone dose
-    methylprednisolone_chart = alt.Chart(avg_daily_methylprednisolone).mark_line(point=True).encode(
+    # Plot average daily methylprednisolone dose
+    methylprednisolone_chart = alt.Chart(avg_daily_methylprednisolone).mark_line().encode(
         x=alt.X('days_from_tx:Q', title='Days Post-Transplant'),
         y=alt.Y('avg_dose:Q', title='Average Daily Dose (mg)'),
         tooltip=['days_from_tx', 'avg_dose', 'n_patients']
     ).properties(
-        title='Average Daily Prednisone Dose (21 Days Post Transplant ICU `in_dttm`)',
+        title='Average Daily Methylprednisolone Dose (21 Days Post Transplant ICU `in_dttm`)',
         width=500,
         height=300
-    )
+    ).configure_axis(grid=False).configure_view(strokeWidth=0)
     # Sum doses per patient per day (for days they received it)
     daily_dose_per_patient = (
         methylprednisolone_merged_21d
@@ -892,7 +971,7 @@ def _(alt, methylprednisolone_merged, pd):
     )
 
     # Plot average daily prednisone dose
-    methylprednisolone_chart = alt.Chart(avg_daily_methylprednisolone).mark_line(point=True).encode(
+    methylprednisolone_chart = alt.Chart(avg_daily_methylprednisolone).mark_line().encode(
         x=alt.X('days_from_tx:Q', title='Days Post-Transplant'),
         y=alt.Y('avg_dose:Q', title='Average Daily Dose (mg)'),
         tooltip=['days_from_tx', 'avg_dose', 'n_patients']
@@ -900,7 +979,7 @@ def _(alt, methylprednisolone_merged, pd):
         title='Average Daily Prednisone Dose (21 Days Post-Transplant)',
         width=500,
         height=300
-    )
+    ).configure_axis(grid=False).configure_view(strokeWidth=0)
     return avg_daily_methylprednisolone, methylprednisolone_chart
 
 
