@@ -626,7 +626,7 @@ def _(
         (_adt_merged['transplant_cross_clamp'] <= _adt_merged['out_dttm'])
     ].drop_duplicates('hospitalization_id', keep='first')
 
-    rows.append({"Characteristic": "Location at cross-clamp", "Value": ""})
+    rows.append({"Characteristic": "Location at first high dose methylpred admin", "Value": ""})
     for loc, cnt in _location_at_xclamp['location_category'].value_counts().items():
         rows.append({"Characteristic": f"  {loc}", "Value": n_pct(cnt, n_total)})
 
@@ -635,21 +635,15 @@ def _(
     # Filter to inotropes only
     inotrope_meds = meds_24hr[meds_24hr['med_category'].isin(inotrope_list)]
 
-    # Find first inotrope per hospitalization (earliest admin_dttm)
-    first_inotrope = (
-        inotrope_meds
-        .sort_values('admin_dttm')
-        .drop_duplicates('hospitalization_id', keep='first')
-    )
-
-    n_any_inotrope = first_inotrope['hospitalization_id'].nunique()
+    # Count unique patients that received any inotrope
+    n_any_inotrope = inotrope_meds['patient_id'].nunique()
     rows.append({"Characteristic": "Any inotrope post-op (24hr)", "Value": n_pct(n_any_inotrope, n_total)})
 
-    # Count by first inotrope given
-    rows.append({"Characteristic": "First inotrope post-op (24hr)", "Value": ""})
+    # Count of inotropes given in first 24hr (by hospitalization)
+    rows.append({"Characteristic": "Inotropes received post-op (24hr)", "Value": ""})
     for med in inotrope_list:
-        n_first = (first_inotrope['med_category'] == med).sum()
-        rows.append({"Characteristic": f"  {med.capitalize()}", "Value": n_pct(n_first, n_any_inotrope)})
+        n_received = inotrope_meds[inotrope_meds['med_category'] == med]['hospitalization_id'].nunique()
+        rows.append({"Characteristic": f"  {med.capitalize()}", "Value": n_pct(n_received, n_any_inotrope)})
 
     # methylprednisolone after transplant
     # Merge methylprednisolone data with transplant cohort
@@ -731,7 +725,7 @@ def _(HEART_TRANSPLANT_HOSPITALIZATIONS, logger, meds_table, pd):
 
     # Step 2: Filter to 24hr and 7-day windows
     meds_24hr = _meds_merged[
-        (_meds_merged['hours_from_tx'] >= 0) & (_meds_merged['hours_from_tx'] <= 24)
+        (_meds_merged['hours_from_tx'] >= 0) & (_meds_merged['hours_from_tx'] <= 23)
     ].copy()
     meds_24hr['tx_hour'] = meds_24hr['hours_from_tx'].astype(int)
 
@@ -880,13 +874,13 @@ def _(alt, hourly_meds_summary, pd):
 def _(alt, methylprednisolone_merged, pd):
     # Filter to 21 days post-transplant (day 1 to day 21)
     methylprednisolone_merged_21d = methylprednisolone_merged[
-        (methylprednisolone_merged['days_from_tx'] >= 1) &
-        (methylprednisolone_merged['days_from_tx'] <= 21)
+        (methylprednisolone_merged['days_from_tx'] >= 0) &
+        (methylprednisolone_merged['days_from_tx'] <= 20)
     ].copy()
     # Filter to 21 days post-transplant (day 1 to day 21)
     methylprednisolone_merged_21d = methylprednisolone_merged[
-        (methylprednisolone_merged['days_from_tx'] >= 1) &
-        (methylprednisolone_merged['days_from_tx'] <= 21)
+        (methylprednisolone_merged['days_from_tx'] >= 0) &
+        (methylprednisolone_merged['days_from_tx'] <= 20)
     ].copy()
 
     # Sum doses per patient per day (for days they received it)
@@ -909,7 +903,7 @@ def _(alt, methylprednisolone_merged, pd):
     _grid_rows = []
     for _, _row in _patient_day_bounds.iterrows():
         _hosp_id = _row['hospitalization_id']
-        for _day in range(int(_row['first_day']), 22):  # days up to 21
+        for _day in range(int(_row['first_day']), 21):  # days up to 21
             _grid_rows.append({'hospitalization_id': _hosp_id, 'days_from_tx': _day})
 
     _patient_day_grid = pd.DataFrame(_grid_rows)
