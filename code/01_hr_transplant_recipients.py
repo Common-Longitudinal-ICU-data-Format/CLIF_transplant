@@ -196,6 +196,8 @@ def _(
             filters = {'med_category':['methylprednisolone']}
         )
         logger.info(f"Loaded meds intermtable: {meds_interm_table.df['hospitalization_id'].nunique():,} unique hospitalizations")
+        # Convert med_dose to numeric (handles string values in source data)
+        meds_interm_table.df["med_dose"] = pd.to_numeric(meds_interm_table.df["med_dose"], errors="coerce")
         log_memory("After loading meds interm table table")
     except Exception as e:
         logger.error(f"Error loading meds interm table table: {e}")
@@ -209,6 +211,8 @@ def _(
             columns=['hospitalization_id', 'admin_dttm', 'med_category', 'med_dose', 'med_dose_unit']
         )
         logger.info(f"Loaded meds: {meds_table.df['hospitalization_id'].nunique():,} unique hospitalizations")
+        # Convert med_dose to numeric (handles string values in source data)
+        meds_table.df["med_dose"] = pd.to_numeric(meds_table.df["med_dose"], errors="coerce")
         log_memory("After loading meds table")
     except Exception as e:
         logger.error(f"Error loading meds table: {e}")
