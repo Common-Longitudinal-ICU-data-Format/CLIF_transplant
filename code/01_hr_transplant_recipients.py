@@ -205,7 +205,7 @@ def _(
             data_directory=str(tables_path),
             filetype=file_type,
             timezone=time_zone,
-            filters={'med_category': ['dobutamine', 'milrinone', 'dopamine', 'epinephrine', 'norepinephrine', 'nitric_oxide']},
+            filters={'med_category': ['dobutamine', 'milrinone', 'dopamine', 'epinephrine', 'norepinephrine', 'isoproterenol', 'nitric_oxide']},
             columns=['hospitalization_id', 'admin_dttm', 'med_category', 'med_dose', 'med_dose_unit']
         )
         logger.info(f"Loaded meds: {meds_table.df['hospitalization_id'].nunique():,} unique hospitalizations")
@@ -269,6 +269,7 @@ def _(
         "epinephrine": "mcg/kg/min",
         "dopamine": "mcg/kg/min",
         "dobutamine": "mcg/kg/min",
+        "isoproterenol":"mcg/min",
         "milrinone": "mcg/kg/min"
     }
 
@@ -570,7 +571,7 @@ def _(
     for val, cnt in hosp_df['discharge_category'].value_counts().items():
         rows.append({"Characteristic": f"  {val}", "Value": n_pct(cnt, n_total)})
 
-    inotrope_list = ['dobutamine', 'milrinone', 'dopamine', 'epinephrine', 'norepinephrine']
+    inotrope_list = ['dobutamine', 'dopamine', 'epinephrine', 'isoproterenol', 'milrinone', 'norepinephrine']
 
     # Filter to inotropes only
     inotrope_meds = meds_24hr[meds_24hr['med_category'].isin(inotrope_list)]
@@ -682,7 +683,7 @@ def _(HEART_TRANSPLANT_HOSPITALIZATIONS, meds_table, pd):
 
     # Step 3: Create Complete Skeleton Grid (ALL patients × ALL hours × ALL medications)
     _transplant_hosp_ids = HEART_TRANSPLANT_HOSPITALIZATIONS['hospitalization_id'].unique()
-    _med_categories = ['dobutamine', 'milrinone', 'dopamine', 'epinephrine', 'norepinephrine', 'nitric_oxide']
+    _med_categories = ['dobutamine', 'milrinone', 'dopamine', 'epinephrine', 'norepinephrine', 'nitric_oxide', 'isoproterenol']
 
     _skeleton = pd.DataFrame([
         {"hospitalization_id": h, "tx_hour": hr, "med_category": med}
