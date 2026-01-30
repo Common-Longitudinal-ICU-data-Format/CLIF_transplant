@@ -225,6 +225,7 @@ def _(
     except Exception as e:
         logger.error(f"Error loading adt table: {e}")
     return (
+        adt_table,
         config,
         hosp_table,
         labs_table,
@@ -539,6 +540,7 @@ def _(mo):
 @app.cell
 def _(
     HEART_TRANSPLANT_HOSPITALIZATIONS,
+    adt_table,
     hosp_table,
     labs_table,
     meds_24hr,
@@ -608,6 +610,25 @@ def _(
     rows.append({"Characteristic": "Discharge disposition", "Value": ""})
     for val, cnt in hosp_df['discharge_category'].value_counts().items():
         rows.append({"Characteristic": f"  {val}", "Value": n_pct(cnt, n_total)})
+
+    # Location at transplant cross-clamp time
+    _latest_hosp_per_patient = (
+        HEART_TRANSPLANT_HOSPITALIZATIONS
+        .sort_values('transplant_cross_clamp', ascending=False)
+        .drop_duplicates('patient_id', keep='first')
+    )
+    _adt_merged = adt_table.df.merge(
+        _latest_hosp_per_patient[['hospitalization_id', 'transplant_cross_clamp']],
+        on='hospitalization_id', how='inner'
+    )
+    _location_at_xclamp = _adt_merged[
+        (_adt_merged['in_dttm'] <= _adt_merged['transplant_cross_clamp']) &
+        (_adt_merged['transplant_cross_clamp'] <= _adt_merged['out_dttm'])
+    ].drop_duplicates('hospitalization_id', keep='first')
+
+    rows.append({"Characteristic": "Location at cross-clamp", "Value": ""})
+    for loc, cnt in _location_at_xclamp['location_category'].value_counts().items():
+        rows.append({"Characteristic": f"  {loc}", "Value": n_pct(cnt, n_total)})
 
     inotrope_list = ['dobutamine', 'dopamine', 'epinephrine', 'isoproterenol', 'milrinone', 'norepinephrine']
 
