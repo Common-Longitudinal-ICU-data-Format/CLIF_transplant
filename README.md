@@ -1,60 +1,78 @@
-# CLIF to Valeos inpatient
+# CLIF Heart Transplant Recipients
 
 ## CLIF VERSION 2.1
 
 ## Objective
 
-Use CPT procedure codes to identify transplant recipient hospitalizations in comprehensive CLIF database (e.g. all adult inpatients)
+Identify heart transplant recipient hospitalizations from CLIF databases using CPT procedure codes and analyze post-transplant medication patterns.
 
 ## Required CLIF tables and fields
 
-Please refer to the online [CLIF data dictionary](https://clif-consortium.github.io/website/data-dictionary.html), [ETL tools](https://github.com/clif-consortium/CLIF/tree/main/etl-to-clif-resources), and [specific table contacts](https://github.com/clif-consortium/CLIF?tab=readme-ov-file#relational-clif) for more information on constructing the required tables and fields. 
+Please refer to the online [CLIF data dictionary](https://clif-consortium.github.io/website/data-dictionary.html), [ETL tools](https://github.com/clif-consortium/CLIF/tree/main/etl-to-clif-resources), and [specific table contacts](https://github.com/clif-consortium/CLIF?tab=readme-ov-file#relational-clif) for more information on constructing the required tables and fields.
 
-The following 2.0 tables are required:
-1. **patient**: 
-2. **hospitalization**: 
-3. **vitals**: 
-4. **labs**: 
-5. **medication_admin_continuous**
-6. **medication_admin_intermittment**:
-7. **respiratory_support**
+The following CLIF tables are required:
 
-the following 2.1 tables are required
-8. **crrt_therapy**
-9. **ecmo_mcs**
-10. **patient_procedure**
-11. **microbiology_culture**
-12. **microbiology_susceptibilty**
+| Table | Required Columns |
+|-------|------------------|
+| **patient** | patient_id, race_category, ethnicity_category, sex_category, birth_date |
+| **hospitalization** | patient_id, hospitalization_id, admission_dttm, discharge_dttm, admission_type_category, discharge_category |
+| **vitals** | hospitalization_id, recorded_dttm, vital_category, vital_value (filtered to weight_kg) |
+| **labs** | hospitalization_id, lab_result_dttm, lab_order_category, lab_category, lab_value_numeric (creatinine, bilirubin_total, albumin, sodium) |
+| **medication_admin_continuous** | hospitalization_id, admin_dttm, med_category, med_dose, med_dose_unit (dobutamine, milrinone, dopamine, epinephrine, norepinephrine, isoproterenol, nitric_oxide) |
+| **medication_admin_intermittent** | hospitalization_id, med_category, admin_dttm, med_dose, med_dose_unit (methylprednisolone) |
+| **adt** | hospitalization_id, in_dttm, out_dttm, location_category |
+| **patient_procedure** | hospitalization_id, procedure_code, procedure_code_format, procedure_billed_dttm |
 
 ## Cohort identification
 
-The cohort will be identified using the following CPT code list
+The cohort is identified using heart transplant CPT codes:
 
-| cpt_code | proc_name                                                     | organ  |
-|----------|---------------------------------------------------------------|--------|
-| 33945    | PR HEART TRANSPLANT W/WO RECIPIENT CARDIECTOMY               | heart  |
-| 33935    | PR HEART-LUNG TRNSPL W/RECIPIENT CARDIECTOMY-PNUMEC          | lung   |
-| 32854    | PR LUNG TRANSPLANT 2 W/CARDIOPULMONARY BYPASS                | lung   |
-| 32852    | PR LUNG TRANSPLANT 1 W/CARDIOPULMONARY BYPASS                | lung   |
-| 32853    | PR LUNG TRANSPLANT 2 W/O CARDIOPULMONARY BYPASS              | lung   |
-| 32851    | PR LUNG TRANSPLANT 1 W/O CARDIOPULMONARY BYPASS              | lung   |
-| 47135    | PR LVR ALTRNSPLJ ORTHOTOPIC PRTL/WHL DON ANY AGE             | liver  |
-| 50360    | PR RENAL ALTRNSPLJ IMPLTJ GRF W/O RCP NEPHRECTOMY            | kidney |
-| 50360    | HC RENAL ALLOTRANSPLANTATION, IMPLANT GRAFT W/O DONOR        | kidney |
-| 50365    | PR RENAL ALTRNSPLJ IMPLTJ GRF W/RCP NEPHRECTOMY              | kidney |
+| cpt_code | proc_name                                                     |
+|----------|---------------------------------------------------------------|
+| 33945    | PR HEART TRANSPLANT W/WO RECIPIENT CARDIECTOMY               |
+| 33935    | PR HEART-LUNG TRNSPL W/RECIPIENT CARDIECTOMY-PNUMEC          |
 
+### Transplant timing
 
+The transplant cross-clamp time is estimated using methylprednisolone administration as a proxy:
+- **Primary**: First methylprednisolone dose >500mg
+- **Fallback**: First methylprednisolone dose >100mg (if no >500mg dose found)
+
+Post-transplant ICU admission time is calculated as:
+- If >500mg dose exists: cross-clamp time + 12 hours
+- If only >100mg dose exists: use admin_dttm directly
 
 ## Expected Results
 
-The initial results will be a database of CLIF tables filtered to transplant recipients `[your institution]_valeos_inpatient_[CLIF table].parquet` These will be in CLIF format, with an additional `transplant` table with columns `patient_id`, `transplant_type`, `recorded_dttm`
+### Cohort file
+`output/intermediate/{site_name}_cohort.csv` containing:
+- `patient_id`
+- `hospitalization_id`
+- `transplant_cross_clamp`
+- `post_transplant_ICU_in_dttm`
 
-Summary tables, statistics, and initial exploratory data analysis will be available in the [`output/final`](output/README.md) directory.
+> **⚠️ Important**: Do not upload any files from `output/intermediate/`. These contain patient-level data and should remain local to your site.
+
+### Summary outputs in `output/final/`
+- `{site_name}_hourly_meds_summary.csv` - Hourly medication dose summaries (0-168 hours post-transplant)
+- `{site_name}_aggregate_registry_comp.csv` - Registry comparison by year
+- `{site_name}_tableone.csv` - Demographics and clinical characteristics
+- `{site_name}_methylprednisolone_chart_daily_summary.csv` - Daily methylprednisolone summary (21 days)
+
+### Figures in `output/final/figures/`
+- Hourly dose and patient count charts for each vasoactive/inotrope
+- Daily methylprednisolone dose chart
 
 ## Detailed Instructions for running the project
 
 ## 1. Update `config/config.json`
 Follow instructions in the [config/README.md](config/README.md) file for detailed configuration steps.
+
+Required configuration fields:
+- `site_name`: Institution identifier
+- `tables_path`: Path to CLIF tables
+- `file_type`: Data format (csv/parquet/fst)
+- `time_zone`: Site timezone for datetime conversions
 
 ## 2. Set up the project environment
 
@@ -68,7 +86,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Then install dependencies and run code:
 ```bash
 uv sync
-uv run marimo edit code/heart_transplant_report.py
+uv run marimo edit code/01_hr_transplant_recipients.py
 ```
 
 ### Option B: Using traditional venv
@@ -77,10 +95,22 @@ uv run marimo edit code/heart_transplant_report.py
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+marimo edit code/01_hr_transplant_recipients.py
 ```
 
 ## 3. Run code
-Detailed instructions on the code workflow are provided in the [code directory](code/README.md)
+
+The main analysis notebook is `code/01_hr_transplant_recipients.py` (a marimo notebook). It performs:
+
+1. **Data Loading**: Loads CLIF tables using `clifpy` with site-specific configuration
+2. **Unit Conversion**: Converts medication doses to standardized units (mcg/kg/min for vasoactives)
+3. **Cohort Identification**: Identifies heart transplant procedures and estimates transplant timing
+4. **Registry Comparison**: Compares identified cases against national registry data
+5. **Table One Generation**: Computes demographics, discharge disposition, and clinical characteristics
+6. **Medication Analysis**: Generates hourly summaries for vasoactives/inotropes (7 days) and daily methylprednisolone (21 days)
+7. **Export**: Saves all outputs to `output/final/` and `output/intermediate/`
+
+Logs are written to `output/final/logs/` for debugging.
 
 ---
 
