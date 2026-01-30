@@ -83,10 +83,9 @@ Required configuration fields:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Then install dependencies and run code:
+Then install dependencies:
 ```bash
 uv sync
-uv run marimo edit code/01_hr_transplant_recipients.py
 ```
 
 ### Option B: Using traditional venv
@@ -95,12 +94,31 @@ uv run marimo edit code/01_hr_transplant_recipients.py
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-marimo edit code/01_hr_transplant_recipients.py
 ```
 
 ## 3. Run code
 
-The main analysis notebook is `code/01_hr_transplant_recipients.py` (a marimo notebook). It performs:
+The main analysis notebook is `code/01_hr_transplant_recipients.py` (a marimo notebook).
+
+### Run as Python script (recommended)
+```bash
+# Using uv
+uv run python code/01_hr_transplant_recipients.py
+
+# Using venv
+python code/01_hr_transplant_recipients.py
+```
+
+### Run interactively in browser (optional)
+```bash
+# Using uv
+uv run marimo edit code/01_hr_transplant_recipients.py
+
+# Using venv
+marimo edit code/01_hr_transplant_recipients.py
+```
+
+The notebook performs:
 
 1. **Data Loading**: Loads CLIF tables using `clifpy` with site-specific configuration
 2. **Unit Conversion**: Converts medication doses to standardized units (mcg/kg/min for vasoactives)
