@@ -609,20 +609,20 @@ def _(
 
     # Sex - only show Male
     rows.append({"Characteristic": "Sex", "Value": ""})
-    n_male = (pt_df['sex_category'] == 'Male').sum()
+    n_male = (pt_df['sex_category'].str.lower() == 'male').sum()
     rows.append({"Characteristic": "  Male", "Value": n_pct(n_male, n_patients)})
 
     # Race - show Asian, Black, White, group rest as Other
     rows.append({"Characteristic": "Race", "Value": ""})
     for race in ['Asian', 'Black or African American', 'White']:
-        n_race = (pt_df['race_category'] == race).sum()
+        n_race = (pt_df['race_category'].str.lower() == race.lower()).sum()
         rows.append({"Characteristic": f"  {race}", "Value": n_pct(n_race, n_patients)})
-    n_other_race = (~pt_df['race_category'].isin(['Asian', 'Black or African American', 'White'])).sum()
+    n_other_race = (~pt_df['race_category'].str.lower().isin(['asian', 'black or african american', 'white'])).sum()
     rows.append({"Characteristic": "  Other", "Value": n_pct(n_other_race, n_patients)})
 
     # Ethnicity - only show Hispanic
     rows.append({"Characteristic": "Ethnicity", "Value": ""})
-    n_hispanic = (pt_df['ethnicity_category'] == 'Hispanic').sum()
+    n_hispanic = (pt_df['ethnicity_category'].str.lower() == 'hispanic').sum()
     rows.append({"Characteristic": "  Hispanic", "Value": n_pct(n_hispanic, n_patients)})
 
     # Age at transplant
