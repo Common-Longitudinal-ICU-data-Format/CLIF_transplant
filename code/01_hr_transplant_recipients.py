@@ -512,23 +512,53 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(Path, pd, site_name, tx_patients_by_year_c):
+def _(Path, logger, pd, site_name, tx_patients_by_year_c):
     # Load national registry data filtered by site_name
     _registry_path_c = Path(__file__).resolve().parent.parent / 'public' / 'data' / 'clif_hr_tx_counts.csv'
     _registry_df_c = pd.read_csv(_registry_path_c)
 
-    registry_ucmc_df_c = _registry_df_c[
-        (_registry_df_c['clif_site'] == site_name) &
-        (_registry_df_c['ORG_TY'] == 'HR') &
-        (_registry_df_c['peds'] == 0)
+    # Check if site_name exists in registry (case-insensitive)
+    _valid_sites = _registry_df_c['clif_site'].str.lower().unique()
+    _site_found = site_name.lower() in _valid_sites
 
-    ].copy()
-    compare_c = tx_patients_by_year_c.merge(registry_ucmc_df_c[['year', 'transplants']], right_on = 'year', left_on = 'tx_year', how = 'inner')
-    compare_c = compare_c.rename(
-        columns={'transplants': 'srtr_hx_transplants',
-                'n_patients': 'clif_hx_transplants'}
-    )
-    registry_comparison = compare_c.drop(columns = 'year')
+    if not _site_found:
+        logger.warning(f"Site '{site_name}' not found in registry. Valid sites: {sorted(_registry_df_c['clif_site'].unique())}")
+        logger.warning("Saving CLIF yearly aggregates only (no registry comparison)")
+        # Fallback: just save CLIF yearly counts without registry merge
+        registry_comparison = tx_patients_by_year_c.rename(
+            columns={'n_patients': 'clif_hx_transplants'}
+        ).copy()
+    else:
+        registry_ucmc_df_c = _registry_df_c[
+            (_registry_df_c['clif_site'].str.lower() == site_name.lower()) &
+            (_registry_df_c['ORG_TY'] == 'HR') &
+            (_registry_df_c['peds'] == 0)
+        ].copy()
+
+        # Check for year overlap between CLIF data and registry
+        _clif_years = set(tx_patients_by_year_c['tx_year'].dropna().astype(int))
+        _registry_years = set(registry_ucmc_df_c['year'].unique()) if not registry_ucmc_df_c.empty else set()
+        _overlapping_years = _clif_years.intersection(_registry_years)
+
+        if not _overlapping_years:
+            logger.warning(f"No overlapping years between CLIF data and registry. CLIF years: {sorted(_clif_years)}, Registry years (2018-2024): {sorted(_registry_years)}")
+            logger.warning("Saving CLIF yearly aggregates only (no registry comparison)")
+            # Fallback: just save CLIF yearly counts without registry merge
+            registry_comparison = tx_patients_by_year_c.rename(
+                columns={'n_patients': 'clif_hx_transplants'}
+            ).copy()
+        else:
+            _missing_clif_years = _clif_years - _registry_years
+            if _missing_clif_years:
+                logger.warning(f"Some CLIF years not in registry (will be excluded from comparison): {sorted(_missing_clif_years)}")
+
+            compare_c = tx_patients_by_year_c.merge(registry_ucmc_df_c[['year', 'transplants']], right_on = 'year', left_on = 'tx_year', how = 'inner')
+            compare_c = compare_c.rename(
+                columns={'transplants': 'srtr_hx_transplants',
+                        'n_patients': 'clif_hx_transplants'}
+            )
+            registry_comparison = compare_c.drop(columns = 'year')
+
     registry_comparison
     return (registry_comparison,)
 
@@ -709,9 +739,20 @@ def _(mo):
 
 
 @app.cell
-def _(final_df):
+def _(final_df, logger):
     # Define HEART_TRANSPLANT_HOSPITALIZATIONS first so other cells can use it
-    HEART_TRANSPLANT_HOSPITALIZATIONS = final_df
+    # Filter to only include years 2018-2024 (registry comparison years)
+    _n_before = final_df['patient_id'].nunique()
+    HEART_TRANSPLANT_HOSPITALIZATIONS = final_df[
+        (final_df['tx_year'] >= 2018) & (final_df['tx_year'] <= 2024)
+    ].copy()
+    _n_after = HEART_TRANSPLANT_HOSPITALIZATIONS['patient_id'].nunique()
+
+    if _n_before != _n_after:
+        logger.info(f"Filtered to years 2018-2024: {_n_before} -> {_n_after} patients ({_n_before - _n_after} excluded)")
+    else:
+        logger.info(f"All {_n_after} patients within years 2018-2024")
+
     return (HEART_TRANSPLANT_HOSPITALIZATIONS,)
 
 
