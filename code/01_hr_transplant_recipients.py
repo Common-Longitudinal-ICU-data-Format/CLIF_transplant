@@ -364,14 +364,15 @@ def _(clif_tx_hospids, log_memory, logger, meds_interm_table, pd):
 
     # Step 2a: Filter methylprednisolone by dose thresholds
     # Primary: >500mg, Fallback: >100mg
+    # Note: Use case-insensitive comparison for med_dose_unit (some sites use "MG" vs "mg")
     xclamp_methylpred_gt500 = methylpred_steroids[
         (methylpred_steroids["med_dose"] > 500) &
-        (methylpred_steroids["med_dose_unit"] == "mg")
+        (methylpred_steroids["med_dose_unit"].str.lower() == "mg")
     ].copy()
 
     xclamp_methylpred_gt100 = methylpred_steroids[
         (methylpred_steroids["med_dose"] > 100) &
-        (methylpred_steroids["med_dose_unit"] == "mg")
+        (methylpred_steroids["med_dose_unit"].str.lower() == "mg")
     ].copy()
 
     # Get first >500mg dose per hospitalization
@@ -414,10 +415,10 @@ def _(clif_tx_hospids, log_memory, logger, meds_interm_table, pd):
 def _(clif_tx_patientids_xclamp, logger, meds_interm_table, pd):
     # Calculate post_transplant_ICU_in_dttm based on methylprednisolone doses
 
-    # Get all methylprednisolone doses in mg
+    # Get all methylprednisolone doses in mg (case-insensitive)
     methylpred_all = meds_interm_table.df[
         (meds_interm_table.df["med_category"] == "methylprednisolone") &
-        (meds_interm_table.df["med_dose_unit"] == "mg")
+        (meds_interm_table.df["med_dose_unit"].str.lower() == "mg")
     ].copy()
 
     # Option 1: First dose > 500mg, then add 12 hours
@@ -630,7 +631,7 @@ def _(
     cohort_with_dates = cohort_with_dates.merge(pt_df[['patient_id', 'birth_date']], on='patient_id', how='left')
     # Handle timezone awareness for birth_date
     if cohort_with_dates['birth_date'].dt.tz is None:
-        cohort_with_dates['birth_date'] = pd.to_datetime(cohort_with_dates['birth_date']).dt.tz_localize('UTC')
+        cohort_with_dates['birth_date'] = pd.to_datetime(cohort_with_dates['birth_date']).dt.tz_localize(config['time_zone'])
     age_at_tx = (cohort_with_dates['transplant_cross_clamp'] - cohort_with_dates['birth_date']).dt.days / 365.25
     rows.append({"Characteristic": "Age at transplant (years), median [IQR]", "Value": median_iqr(age_at_tx)})
 
